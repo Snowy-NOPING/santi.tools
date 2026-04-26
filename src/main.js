@@ -215,16 +215,9 @@ initAuth();
 // Uses Google's OAuth2 implicit flow via a temporary local Rust HTTP server.
 // You must register your OAuth client at console.cloud.google.com and set
 // the redirect URI to: http://127.0.0.1:3434/callback
-let GOOGLE_CLIENT_ID = localStorage.getItem('google_client_id') || 'YOUR_GOOGLE_CLIENT_ID';
+const GOOGLE_CLIENT_ID = '361280138230-v4im52uu57ef2k90qmeueddojsrtqtok.apps.googleusercontent.com';
 
 async function startGoogleOAuth() {
-    if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID' || !GOOGLE_CLIENT_ID) {
-        const input = prompt("To use Google Login, please enter your Google OAuth Client ID:\n\n(Make sure you added http://127.0.0.1:3434/callback to your Authorized Redirect URIs in Google Cloud Console!)");
-        if (!input) return;
-        GOOGLE_CLIENT_ID = input.trim();
-        localStorage.setItem('google_client_id', GOOGLE_CLIENT_ID);
-    }
-
     const state = generateSalt();
     sessionStorage.setItem('oauth-state', state);
 
