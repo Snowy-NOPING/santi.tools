@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.3.0] - 2025-04-26
+## [1.4.0] - 2025-04-26
 
 ### Added
 - image host tab — upload any file to nest.rip, view/copy links, delete files, all in a grid UI

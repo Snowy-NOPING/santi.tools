@@ -57,18 +57,18 @@ jobs:
         run: |
           $ver = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
-          Write-Host "Version: $ver"
 
-      - name: Find NSIS installer
-        id: nsis
+      - name: Find Tauri NSIS installer
+        id: tauri_exe
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Recurse src-tauri/target/release/bundle/nsis `
+          $nsis = Get-ChildItem -Recurse src-tauri/target/release/bundle/nsis `
             -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) { throw "NSIS installer not found in bundle output" }
-          echo "PATH=$($exe.FullName)" >> $env:GITHUB_OUTPUT
-          Write-Host "NSIS: $($exe.FullName) ($([math]::Round($exe.Length/1MB,1)) MB)"
+          if (-not $nsis) { throw "Tauri NSIS installer not found" }
+          echo "PATH=$($nsis.FullName)" >> $env:GITHUB_OUTPUT
+          Write-Host "Found: $($nsis.FullName)"
 
+      # ── Build the custom animated Inno Setup installer ──
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -78,23 +78,23 @@ jobs:
         run: |
           Add-Type -AssemblyName System.Drawing
 
+          # Sidebar image 164x314 — dark with purple glow
           $bmp = New-Object System.Drawing.Bitmap(164, 314)
           $g   = [System.Drawing.Graphics]::FromImage($bmp)
           $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
           $g.Clear([System.Drawing.Color]::FromArgb(10, 10, 10))
           $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
             [System.Drawing.Point]::new(0,0), [System.Drawing.Point]::new(164,200),
-            [System.Drawing.Color]::FromArgb(90,212,160,255),
-            [System.Drawing.Color]::FromArgb(0,10,10,10))
+            [System.Drawing.Color]::FromArgb(90, 212, 160, 255),
+            [System.Drawing.Color]::FromArgb(0, 10, 10, 10))
           $g.FillRectangle($brush, 0, 0, 164, 220)
           $f1 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Bold)
           $f2 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Regular)
           $g.DrawString("santi",  $f1, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(212,160,255))), 14, 262)
           $g.DrawString(".tools", $f2, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136,136,136))), 68, 262)
-          $g.Dispose()
-          $bmp.Save("installer/wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
-          $bmp.Dispose()
+          $g.Dispose(); $bmp.Save("installer/wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp); $bmp.Dispose()
 
+          # Small image 55x55 — purple circle with S
           $b2 = New-Object System.Drawing.Bitmap(55, 55)
           $g2 = [System.Drawing.Graphics]::FromImage($b2)
           $g2.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -106,17 +106,17 @@ jobs:
           $g2.FillEllipse($br2, 4, 4, 47, 47)
           $f3 = New-Object System.Drawing.Font("Segoe UI", 20, [System.Drawing.FontStyle]::Bold)
           $g2.DrawString("s", $f3, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10,10,10))), 12, 10)
-          $g2.Dispose()
-          $b2.Save("installer/wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
-          $b2.Dispose()
+          $g2.Dispose(); $b2.Save("installer/wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp); $b2.Dispose()
+
           Write-Host "Artwork generated"
 
       - name: Build custom installer
-        id: installer
+        id: custom_installer
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          $nsisExe = "${{ steps.nsis.outputs.PATH }}"
+          $version  = "${{ steps.version.outputs.VERSION }}"
+          $nsisExe  = "${{ steps.tauri_exe.outputs.PATH }}"
+
           New-Item -ItemType Directory -Force -Path dist | Out-Null
 
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
@@ -126,12 +126,13 @@ jobs:
             /F"santi.tools-$version-setup" `
             "installer/installer.iss"
 
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
-          $out = Resolve-Path "dist/santi.tools-$version-setup.exe"
-          Write-Host "Installer: $out ($([math]::Round((Get-Item $out).Length/1MB,1)) MB)"
-          echo "PATH=$out" >> $env:GITHUB_OUTPUT
+          $out = "dist/santi.tools-$version-setup.exe"
+          Write-Host "Built: $out ($([math]::Round((Get-Item $out).Length/1MB,1)) MB)"
+          echo "PATH=$((Resolve-Path $out).Path)" >> $env:GITHUB_OUTPUT
 
+      # ── Read changelog ──────────────────────────────────
       - name: Read changelog
         id: changelog
         shell: pwsh
@@ -148,16 +149,38 @@ jobs:
           $body = ($notes -join "`n").Trim()
           if (-not $body) { $body = "see commits for changes." }
           Set-Content release-notes.md $body
-          Write-Host "Release notes written"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: "santi.tools v${{ steps.version.outputs.VERSION }}"
-          body_path: release-notes.md
-          draft: false
-          prerelease: false
-          files: dist/santi.tools-${{ steps.version.outputs.VERSION }}-setup.exe
+      # ── Publish GitHub Release ──────────────────────────
+      - name: Publish release
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag      = "${{ github.ref_name }}"
+          $version  = "${{ steps.version.outputs.VERSION }}"
+          $installer = "${{ steps.custom_installer.outputs.PATH }}"
+          $nsisRaw  = "${{ steps.tauri_exe.outputs.PATH }}"
+
+          $existing = gh release view $tag --repo Snowy-NOPING/santi.tools 2>&1
+          $isDraft  = $existing -match "draft"
+
+          $releaseArgs = @(
+            "--repo", "Snowy-NOPING/santi.tools",
+            "--title", "santi.tools v$version",
+            "--notes-file", "release-notes.md"
+          )
+
+          if ($isDraft) {
+            gh release edit $tag @releaseArgs
+            if (Test-Path $installer) {
+              gh release upload $tag $installer --repo Snowy-NOPING/santi.tools --clobber
+            }
+            gh release edit $tag --repo Snowy-NOPING/santi.tools --draft=false
+          } else {
+            $files = @()
+            if (Test-Path $installer) { $files += $installer }
+            gh release create $tag @files @releaseArgs
+          }
+
+          Write-Host "Release v$version published"
+          Write-Host "https://github.com/Snowy-NOPING/santi.tools/releases/tag/$tag"

@@ -7,6 +7,10 @@
   #define AppVersion "0.1.0"
 #endif
 
+#ifndef NsisExe
+  #define NsisExe "..\src-tauri\target\release\bundle\nsis\santi.tools_0.1.0_x64-setup.exe"
+#endif
+
 #define AppName      "santi.tools"
 #define AppPublisher "santi.tools"
 #define AppURL       "https://github.com/Snowy-NOPING/santi.tools"
@@ -35,8 +39,6 @@ WizardSizePercent=120
 ShowLanguageDialog=no
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64
-UninstallDisplayIcon={app}\{#AppExeName}
-UninstallDisplayName={#AppName}
 CloseApplications=yes
 WizardImageFile=wizard-image.bmp
 WizardSmallImageFile=wizard-small.bmp
@@ -52,29 +54,27 @@ english.FinishedHeadingLabel=you're all set
 english.FinishedLabel=santi.tools has been installed.%n%nclick finish to close.
 
 [Files]
-; Main app binary
-Source: "..\src-tauri\target\release\{#AppExeName}"; \
-  DestDir: "{app}"; Flags: ignoreversion
-
-; WebView2 runtime (bundled by Tauri)
-Source: "..\src-tauri\target\release\*.dll"; \
-  DestDir: "{app}"; Flags: ignoreversion recursesubdirs
-
-; yt-dlp sidecar
-Source: "..\src-tauri\bin\yt-dlp-x86_64-pc-windows-msvc.exe"; \
-  DestDir: "{app}"; DestName: "yt-dlp.exe"; Flags: ignoreversion
+; Bundle the Tauri NSIS installer — run it silently in [Run]
+Source: "{#NsisExe}"; DestDir: "{tmp}"; Flags: deleteafterinstall noencryption
 
 [Icons]
-Name: "{group}\{#AppName}";    Filename: "{app}\{#AppExeName}"
-Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{localappdata}\{#AppName}\{#AppExeName}"
+Name: "{commondesktop}\{#AppName}"; Filename: "{localappdata}\{#AppName}\{#AppExeName}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "create a desktop shortcut"; GroupDescription: "additional icons:"
 
 [Run]
-Filename: "{app}\{#AppExeName}"; \
-  Description: "launch {#AppName}"; \
-  Flags: nowait postinstall skipifsilent
+; Silently run the Tauri NSIS installer
+Filename: "{tmp}\{#ExtractFileName(NsisExe)}"; \
+  Parameters: "/S"; \
+  StatusMsg: "installing santi.tools..."; \
+  Flags: waituntilterminated
+
+; Offer to launch after install
+Filename: "{localappdata}\santi.tools\santi.tools.exe"; \
+  Description: "launch santi.tools"; \
+  Flags: nowait postinstall skipifsilent unchecked
 
 ; ── Custom UI code ────────────────────────────────
 [Code]
