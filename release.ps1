@@ -209,9 +209,14 @@ Write-Step "committing version bump..."
 
 git add -A
 
-git commit -m "chore: release v$Version"
-if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
-Write-Ok "committed"
+$status = git status --porcelain
+if ($status) {
+    git commit -m "chore: release v$Version"
+    if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
+    Write-Ok "committed"
+} else {
+    Write-Ok "no new changes to commit"
+}
 
 git tag "v$Version"
 if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed — tag may already exist" }
