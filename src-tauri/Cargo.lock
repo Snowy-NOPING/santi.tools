@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "cobalt-app"
-version = "1.0.0"
+version = "1.4.0"
 dependencies = [
  "dirs-next",
  "reqwest 0.12.28",

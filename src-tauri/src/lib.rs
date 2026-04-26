@@ -298,7 +298,7 @@ async fn nest_exchange_code(code: String) -> Result<String, String> {
     // Exchange the OAuth authorization code for an access token.
     // The client_secret lives here in Rust — never exposed to the frontend.
     let client_id     = "a8b00d4a-652c-4301-a7d6-3764be0d9e2e";
-    let client_secret = env!("NEST_CLIENT_SECRET"); // set via env var at build time
+    let client_secret = option_env!("NEST_CLIENT_SECRET").unwrap_or(""); // set via env var at build time
     let redirect_uri  = "santi-tools://auth/callback";
 
     let client = reqwest::Client::new();
