@@ -1,7 +1,6 @@
 ; =====================================================
 ; santi.tools — Custom Inno Setup Installer
 ; =====================================================
-; Built by GitHub Actions. AppVersion is passed via /DAppVersion=x.x.x
 
 #ifndef AppVersion
   #define AppVersion "0.1.0"
@@ -54,7 +53,6 @@ english.FinishedHeadingLabel=you're all set
 english.FinishedLabel=santi.tools has been installed.%n%nclick finish to close.
 
 [Files]
-; Bundle the Tauri NSIS installer — run it silently in [Run]
 Source: "{#NsisExe}"; DestDir: "{tmp}"; Flags: deleteafterinstall noencryption
 
 [Icons]
@@ -65,40 +63,33 @@ Name: "{commondesktop}\{#AppName}"; Filename: "{localappdata}\{#AppName}\{#AppEx
 Name: "desktopicon"; Description: "create a desktop shortcut"; GroupDescription: "additional icons:"
 
 [Run]
-; Silently run the Tauri NSIS installer
-Filename: "{tmp}\{#ExtractFileName(NsisExe)}"; \
-  Parameters: "/S"; \
-  StatusMsg: "installing santi.tools..."; \
-  Flags: waituntilterminated
+Filename: "{tmp}\{#ExtractFileName(NsisExe)}"; Parameters: "/S"; StatusMsg: "installing santi.tools..."; Flags: waituntilterminated
+Filename: "{localappdata}\santi.tools\santi.tools.exe"; Description: "launch santi.tools"; Flags: nowait postinstall skipifsilent
 
-; Offer to launch after install
-Filename: "{localappdata}\santi.tools\santi.tools.exe"; \
-  Description: "launch santi.tools"; \
-  Flags: nowait postinstall skipifsilent unchecked
-
-; ── Custom UI code ────────────────────────────────
 [Code]
 var
-  AnimFrame:     Integer;
-  DotLabel:      TLabel;
-  BarPanel:      TPanel;
-  BarFill:       TPanel;
-  BarWidth:      Integer;
-  BarProgress:   Integer;
+  AnimFrame:  Integer;
+  DotLabel:   TLabel;
+  BarPanel:   TPanel;
+  BarFill:    TPanel;
+  BarWidth:   Integer;
+  BarProgress: Integer;
+  AnimTimerId: LongWord;
 
-procedure OnAnimTimer(Sender: TObject);
+function SetTimer(hWnd: LongWord; nIDEvent: LongWord; uElapse: LongWord; lpTimerFunc: LongWord): LongWord;
+  external 'SetTimer@user32.dll stdcall';
+function KillTimer(hWnd: LongWord; uIDEvent: LongWord): Boolean;
+  external 'KillTimer@user32.dll stdcall';
+
+procedure TimerProc(hWnd: LongWord; uMsg: LongWord; idEvent: LongWord; dwTime: LongWord);
 begin
   AnimFrame := (AnimFrame + 1) mod 4;
-
-  // Animate dots
   case AnimFrame of
     0: DotLabel.Caption := 'installing';
     1: DotLabel.Caption := 'installing .';
     2: DotLabel.Caption := 'installing . .';
     3: DotLabel.Caption := 'installing . . .';
   end;
-
-  // Animate progress bar fill (fake progress, looks smooth)
   if BarProgress < BarWidth - 4 then
   begin
     BarProgress := BarProgress + 3;
@@ -107,36 +98,26 @@ begin
 end;
 
 procedure InitializeWizard;
-var
-  Page: TOutputProgressWizardPage;
-  i: Integer;
 begin
-  // ── Dark theme the whole wizard ──────────────────
   WizardForm.Color := $0A0A0A;
   WizardForm.Font.Name  := 'Segoe UI';
   WizardForm.Font.Color := $E8E8E8;
   WizardForm.Font.Size  := 10;
 
-  // Welcome page text
   WizardForm.WelcomeLabel1.Font.Size  := 20;
   WizardForm.WelcomeLabel1.Font.Style := [fsBold];
-  WizardForm.WelcomeLabel1.Font.Color := $FFD4A0; // BGR: purple
-
+  WizardForm.WelcomeLabel1.Font.Color := $FFD4A0;
   WizardForm.WelcomeLabel2.Font.Color := $888888;
   WizardForm.WelcomeLabel2.Font.Size  := 10;
 
-  // Finish page
   WizardForm.FinishedHeadingLabel.Font.Size  := 20;
   WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
-  WizardForm.FinishedHeadingLabel.Font.Color := $A0D47D; // green
-
+  WizardForm.FinishedHeadingLabel.Font.Color := $A0D47D;
   WizardForm.FinishedLabel.Font.Color := $888888;
 
-  // Style Next/Back/Cancel buttons
   WizardForm.NextButton.Font.Color   := $0A0A0A;
   WizardForm.CancelButton.Font.Color := $888888;
 
-  // ── Animated dot label on install page ───────────
   DotLabel := TLabel.Create(WizardForm);
   DotLabel.Parent    := WizardForm.InstallingPage;
   DotLabel.AutoSize  := False;
@@ -149,10 +130,8 @@ begin
   DotLabel.Font.Size  := 11;
   DotLabel.Caption    := 'installing';
 
-  // ── Custom progress bar ───────────────────────────
   BarWidth := WizardForm.InstallingPage.Width - 40;
 
-  // Track (background)
   BarPanel := TPanel.Create(WizardForm);
   BarPanel.Parent     := WizardForm.InstallingPage;
   BarPanel.Left       := 20;
@@ -162,44 +141,40 @@ begin
   BarPanel.Color      := $222222;
   BarPanel.BevelOuter := bvNone;
 
-  // Fill (animated)
   BarFill := TPanel.Create(WizardForm);
   BarFill.Parent     := BarPanel;
   BarFill.Left       := 0;
   BarFill.Top        := 0;
   BarFill.Width      := 0;
   BarFill.Height     := 4;
-  BarFill.Color      := $FFD4A0; // purple in BGR
+  BarFill.Color      := $FFD4A0;
   BarFill.BevelOuter := bvNone;
 
   BarProgress := 0;
   AnimFrame   := 0;
+  AnimTimerId := 0;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
-var
-  Timer: TTimer;
 begin
   if CurPageID = wpInstalling then
   begin
     WizardForm.NextButton.Enabled := False;
-
-    // Start animation timer
-    Timer := TTimer.Create(WizardForm);
-    Timer.Interval := 350;
-    Timer.OnTimer  := @OnAnimTimer;
-    Timer.Enabled  := True;
+    AnimTimerId := SetTimer(0, 0, 350, CreateCallback(@TimerProc));
   end;
 
   if CurPageID = wpFinished then
   begin
-    // Fill bar to 100% on finish
-    if BarFill <> nil then
-      BarFill.Width := BarWidth - 4;
+    if AnimTimerId <> 0 then
+    begin
+      KillTimer(0, AnimTimerId);
+      AnimTimerId := 0;
+    end;
+    if BarFill <> nil then BarFill.Width := BarWidth - 4;
     if DotLabel <> nil then
     begin
       DotLabel.Caption    := 'done  ✓';
-      DotLabel.Font.Color := $A0D47D; // green
+      DotLabel.Font.Color := $A0D47D;
     end;
   end;
 end;
@@ -207,4 +182,10 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
+end;
+
+procedure DeinitializeSetup;
+begin
+  if AnimTimerId <> 0 then
+    KillTimer(0, AnimTimerId);
 end;
