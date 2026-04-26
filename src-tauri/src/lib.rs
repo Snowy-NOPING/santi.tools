@@ -293,6 +293,46 @@ async fn get_ytdlp_metadata(app: tauri::AppHandle, url: String) -> Result<String
     Ok(filename)
 }
 
+#[tauri::command]
+async fn nest_exchange_code(code: String) -> Result<String, String> {
+    // Exchange the OAuth authorization code for an access token.
+    // The client_secret lives here in Rust — never exposed to the frontend.
+    let client_id     = "a8b00d4a-652c-4301-a7d6-3764be0d9e2e";
+    let client_secret = env!("NEST_CLIENT_SECRET"); // set via env var at build time
+    let redirect_uri  = "santi-tools://auth/callback";
+
+    let client = reqwest::Client::new();
+    let params = [
+        ("grant_type",    "authorization_code"),
+        ("code",          code.as_str()),
+        ("redirect_uri",  redirect_uri),
+        ("client_id",     client_id),
+        ("client_secret", client_secret),
+    ];
+
+    let resp = client
+        .post("https://nest.rip/api/oauth/token")
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Token request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Token exchange failed: {}", text));
+    }
+
+    let json: serde_json::Value = resp.json().await
+        .map_err(|e| format!("Failed to parse token response: {}", e))?;
+
+    let access_token = json["access_token"]
+        .as_str()
+        .ok_or("No access_token in response")?
+        .to_string();
+
+    Ok(access_token)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -304,7 +344,8 @@ pub fn run() {
             cobalt_server_info,
             download_file,
             download_with_ytdlp,
-            get_ytdlp_metadata
+            get_ytdlp_metadata,
+            nest_exchange_code
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

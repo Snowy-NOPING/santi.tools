@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Rust build output
+src-tauri/target/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +25,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Never commit sensitive files
+cookies.json
+cookies*.json
+*.cookies
+*.key
+*.pem
+
+# Release artifacts
+cobalt-app/dist/
+installer/wizard-image.bmp
+installer/wizard-small.bmp
+release-notes.md

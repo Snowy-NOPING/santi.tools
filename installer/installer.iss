@@ -69,7 +69,7 @@ Name: "{group}\{#AppName}";    Filename: "{app}\{#AppExeName}"
 Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "create a desktop shortcut"; GroupDescription: "additional icons:"; Flags: checked
+Name: "desktopicon"; Description: "create a desktop shortcut"; GroupDescription: "additional icons:"
 
 [Run]
 Filename: "{app}\{#AppExeName}"; \

@@ -109,6 +109,22 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
                     <span class="sidebar-label">remix</span>
                 </button>
+                <button id="btn-compress" class="sidebar-btn" title="Compress">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    <span class="sidebar-label">compress</span>
+                </button>
+                <button id="btn-history" class="sidebar-btn" title="History">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span class="sidebar-label">history</span>
+                </button>
+                <button id="btn-notes" class="sidebar-btn" title="Notes">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                    <span class="sidebar-label">notes</span>
+                </button>
+                <button id="btn-imghost" class="sidebar-btn" title="Image Host">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span class="sidebar-label">host</span>
+                </button>
             </div>
         </div>
         <div class="sidebar-bottom">
@@ -449,6 +465,140 @@
                 <div class="about-version">
                     <span>version 0.1.0</span>
                 </div>
+            </div>
+        </section>
+
+        <!-- History View -->
+        <section id="view-history" class="view">
+            <div class="history-layout">
+                <div class="history-header">
+                    <h2 class="history-title">history</h2>
+                    <button id="btn-clear-history" class="history-clear-btn" title="Clear all history">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                        clear all
+                    </button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <div class="history-empty">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <p>no downloads yet</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Compress View -->
+        <section id="view-compress" class="view">
+            <div class="compress-layout">
+                <div class="compress-drop-area" id="compress-dropzone">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="compress-drop-icon">
+                        <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                    <p class="compress-drop-text">drag files here or click to select</p>
+                    <p class="compress-drop-formats">video, audio, images — mp4, mov, mp3, jpg, png, gif, webp...</p>
+                    <input type="file" id="compress-file-input" multiple accept="video/*,audio/*,image/*" />
+                </div>
+
+                <div id="compress-queue" class="compress-queue hidden"></div>
+
+                <div class="compress-options" id="compress-options">
+                    <div class="compress-opt-group">
+                        <label class="compress-opt-label">quality</label>
+                        <div class="seg-ctrl" data-setting="compressQuality">
+                            <button class="seg-btn" data-val="high">high</button>
+                            <button class="seg-btn active" data-val="balanced">balanced</button>
+                            <button class="seg-btn" data-val="small">smallest</button>
+                        </div>
+                        <p class="stg-hint">balanced keeps good quality while reducing file size. smallest prioritises size over quality.</p>
+                    </div>
+                    <button id="btn-compress-run" class="compress-run-btn" disabled>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                        compress
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Notes View -->
+        <section id="view-notes" class="view">
+            <div class="notes-layout">
+                <!-- Sidebar: note list -->
+                <div class="notes-sidebar">
+                    <div class="notes-sidebar-header">
+                        <span class="notes-sidebar-title">notes</span>
+                        <button id="btn-new-note" class="notes-new-btn" title="New note">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                    </div>
+                    <div id="notes-list" class="notes-list"></div>
+                </div>
+                <!-- Editor -->
+                <div class="notes-editor-wrap" id="notes-editor-wrap">
+                    <div class="notes-empty-state" id="notes-empty-state">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <p>select a note or create a new one</p>
+                    </div>
+                    <div class="notes-editor hidden" id="notes-editor">
+                        <input id="note-title-input" class="note-title-input" type="text" placeholder="title" spellcheck="false" />
+                        <textarea id="note-body-input" class="note-body-input" placeholder="start writing..."></textarea>
+                        <div class="note-meta" id="note-meta"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Image Host View -->
+        <section id="view-imghost" class="view">
+            <div class="imghost-layout">
+
+                <!-- Not connected state -->
+                <div id="imghost-setup" class="imghost-setup hidden">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>connect your <a href="https://nest.rip" target="_blank" rel="noopener">nest.rip</a> account to upload files</span>
+                </div>
+
+                <!-- Connected user bar -->
+                <div id="imghost-user-bar" class="imghost-user-bar hidden">
+                    <div class="imghost-user-info">
+                        <img id="imghost-user-avatar" class="imghost-user-avatar" src="" alt="" />
+                        <div class="imghost-user-text">
+                            <span id="imghost-user-name" class="imghost-user-name"></span>
+                            <span id="imghost-quota" class="imghost-quota"></span>
+                        </div>
+                    </div>
+                    <button id="imghost-disconnect" class="imghost-disconnect-btn">disconnect</button>
+                </div>
+
+                <!-- Upload area -->
+                <div id="imghost-drop" class="imghost-drop">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="imghost-drop-icon">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p class="imghost-drop-text">drag files here or click to upload</p>
+                    <p class="imghost-drop-hint">any file type · uploaded to nest.rip</p>
+                    <input type="file" id="imghost-file-input" multiple />
+                </div>
+
+                <!-- Uploaded files grid -->
+                <div id="imghost-grid" class="imghost-grid"></div>
+
+                <!-- Auth row -->
+                <div class="imghost-auth-row">
+                    <button id="imghost-oauth-btn" class="imghost-oauth-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        connect nest.rip account
+                    </button>
+                    <span class="imghost-auth-or">or</span>
+                    <div class="imghost-key-wrap">
+                        <div class="auth-input-wrapper" style="height:36px;">
+                            <svg class="auth-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            <input id="imghost-api-key" type="password" placeholder="paste api key manually" spellcheck="false" autocomplete="off" style="font-size:12px;" />
+                        </div>
+                    </div>
+                    <button id="imghost-save-key" class="profile-save-btn" style="align-self:flex-end;height:36px;">save</button>
+                </div>
+
             </div>
         </section>
 

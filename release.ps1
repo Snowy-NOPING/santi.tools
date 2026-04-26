@@ -207,12 +207,7 @@ Confirm-Continue "commit, tag v$Version, and push to GitHub?"
 
 Write-Step "committing version bump..."
 
-git add "src-tauri/tauri.conf.json" "src-tauri/Cargo.toml"
-
-# also stage CHANGELOG if it was modified
-if (Test-Path $changelogPath) {
-    git add $changelogPath
-}
+git add -A
 
 git commit -m "chore: release v$Version"
 if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
@@ -232,9 +227,9 @@ Write-Ok "pushed branch and tag"
 # ── optionally create GitHub release via gh CLI ───────────────────────────────
 
 if ($ghAvailable -and $releaseNotes) {
-    Write-Step "creating GitHub release via gh CLI..."
+    Write-Step "creating draft GitHub release via gh CLI..."
 
-    $tempFile = [System.IO.Path]::GetTempFileName()
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".md"
     Set-Content $tempFile $releaseNotes
 
     gh release create "v$Version" `
@@ -244,16 +239,15 @@ if ($ghAvailable -and $releaseNotes) {
         --draft
 
     Remove-Item $tempFile
-    Write-Ok "draft release created at github.com/Snowy-NOPING/santi.tools/releases"
-    Write-Warn "it's a draft — GitHub Actions will attach the .exe, then you can publish it"
+    Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
 } elseif ($ghAvailable) {
-    Write-Step "creating GitHub release via gh CLI (no notes)..."
+    Write-Step "creating draft GitHub release via gh CLI..."
     gh release create "v$Version" `
         --repo "Snowy-NOPING/santi.tools" `
         --title "santi.tools v$Version" `
         --generate-notes `
         --draft
-    Write-Ok "draft release created"
+    Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
 } else {
     Write-Host ""
     Write-Host "  GitHub Actions will build and publish the release automatically." -ForegroundColor Gray

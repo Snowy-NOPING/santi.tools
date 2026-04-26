@@ -5,10 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag (e.g. v0.2.0) — leave blank to use tauri.conf.json version'
-        required: false
 
 jobs:
   build-windows:
@@ -17,11 +13,9 @@ jobs:
       contents: write
 
     steps:
-      # ── Checkout ──────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Toolchain setup ───────────────────────────
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -35,180 +29,135 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: cobalt-app/src-tauri -> target
+          workspaces: src-tauri -> target
 
-      # ── Frontend ──────────────────────────────────
       - name: Install frontend dependencies
-        working-directory: cobalt-app
         run: bun install
 
-      # ── yt-dlp sidecar ────────────────────────────
       - name: Download yt-dlp sidecar
-        working-directory: cobalt-app
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/bin | Out-Null
-          $url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-          Invoke-WebRequest -Uri $url -OutFile "src-tauri/bin/yt-dlp-x86_64-pc-windows-msvc.exe"
-          Write-Host "✓ yt-dlp downloaded"
+          Invoke-WebRequest `
+            -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" `
+            -OutFile "src-tauri/bin/yt-dlp-x86_64-pc-windows-msvc.exe"
+          Write-Host "yt-dlp downloaded"
 
-      # ── Tauri build ───────────────────────────────
-      - name: Build Tauri app (NSIS + MSI)
-        working-directory: cobalt-app
+      - name: Build Tauri app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          NEST_CLIENT_SECRET: ${{ secrets.NEST_CLIENT_SECRET }}
         run: bun tauri build
 
-      # ── Get version from tauri.conf.json ──────────
-      - name: Get app version
+      - name: Get version
         id: version
         shell: pwsh
         run: |
-          $json = Get-Content cobalt-app/src-tauri/tauri.conf.json | ConvertFrom-Json
-          $ver = $json.version
-          Write-Host "Version: $ver"
+          $ver = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
-          echo "TAG=v$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $ver"
 
-      # ── Find built artifacts ───────────────────────
-      - name: Locate NSIS installer
-        id: artifacts
+      - name: Find NSIS installer
+        id: nsis
         shell: pwsh
         run: |
-          $nsis = Get-ChildItem -Recurse cobalt-app/src-tauri/target/release/bundle/nsis -Filter "*.exe" | Select-Object -First 1
-          $msi  = Get-ChildItem -Recurse cobalt-app/src-tauri/target/release/bundle/msi  -Filter "*.msi" | Select-Object -First 1
-          if ($nsis) {
-            Write-Host "NSIS: $($nsis.FullName)"
-            echo "NSIS_PATH=$($nsis.FullName)" >> $env:GITHUB_OUTPUT
-            echo "NSIS_NAME=$($nsis.Name)"     >> $env:GITHUB_OUTPUT
-          }
-          if ($msi) {
-            Write-Host "MSI: $($msi.FullName)"
-            echo "MSI_PATH=$($msi.FullName)" >> $env:GITHUB_OUTPUT
-            echo "MSI_NAME=$($msi.Name)"     >> $env:GITHUB_OUTPUT
-          }
+          $exe = Get-ChildItem -Recurse src-tauri/target/release/bundle/nsis `
+            -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "NSIS installer not found in bundle output" }
+          echo "PATH=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          Write-Host "NSIS: $($exe.FullName) ($([math]::Round($exe.Length/1MB,1)) MB)"
 
-      # ── Custom Inno Setup installer ───────────────
       - name: Install Inno Setup
         shell: pwsh
-        run: |
-          choco install innosetup --no-progress -y
-          Write-Host "✓ Inno Setup installed"
+        run: choco install innosetup --no-progress -y
 
-      - name: Generate installer bitmaps
+      - name: Generate installer artwork
         shell: pwsh
         run: |
-          # Create a simple dark-themed 164x314 wizard image (BMP)
-          # and 55x55 small image using PowerShell + System.Drawing
           Add-Type -AssemblyName System.Drawing
 
-          # Wizard sidebar image (164x314)
           $bmp = New-Object System.Drawing.Bitmap(164, 314)
-          $g = [System.Drawing.Graphics]::FromImage($bmp)
-          $bg = [System.Drawing.Color]::FromArgb(10, 10, 10)
-          $g.Clear($bg)
-
-          # Gradient purple glow at top
+          $g   = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+          $g.Clear([System.Drawing.Color]::FromArgb(10, 10, 10))
           $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-            [System.Drawing.Point]::new(0, 0),
-            [System.Drawing.Point]::new(164, 160),
-            [System.Drawing.Color]::FromArgb(80, 212, 160, 255),
-            [System.Drawing.Color]::FromArgb(0, 10, 10, 10)
-          )
-          $g.FillRectangle($brush, 0, 0, 164, 200)
-
-          # App name text
-          $font = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Bold)
-          $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(212, 160, 255))
-          $g.DrawString("santi", $font, $textBrush, 16, 260)
-          $font2 = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Regular)
-          $textBrush2 = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136, 136, 136))
-          $g.DrawString(".tools", $font2, $textBrush2, 62, 260)
-
+            [System.Drawing.Point]::new(0,0), [System.Drawing.Point]::new(164,200),
+            [System.Drawing.Color]::FromArgb(90,212,160,255),
+            [System.Drawing.Color]::FromArgb(0,10,10,10))
+          $g.FillRectangle($brush, 0, 0, 164, 220)
+          $f1 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Bold)
+          $f2 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Regular)
+          $g.DrawString("santi",  $f1, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(212,160,255))), 14, 262)
+          $g.DrawString(".tools", $f2, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136,136,136))), 68, 262)
           $g.Dispose()
-          $bmp.Save("cobalt-app/installer/wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+          $bmp.Save("installer/wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
           $bmp.Dispose()
 
-          # Small image (55x55)
-          $bmp2 = New-Object System.Drawing.Bitmap(55, 55)
-          $g2 = [System.Drawing.Graphics]::FromImage($bmp2)
-          $g2.Clear([System.Drawing.Color]::FromArgb(10, 10, 10))
-          $brush2 = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-            [System.Drawing.Point]::new(0, 0),
-            [System.Drawing.Point]::new(55, 55),
-            [System.Drawing.Color]::FromArgb(212, 160, 255),
-            [System.Drawing.Color]::FromArgb(124, 92, 191)
-          )
-          $g2.FillEllipse($brush2, 5, 5, 45, 45)
-          $font3 = New-Object System.Drawing.Font("Segoe UI", 18, [System.Drawing.FontStyle]::Bold)
-          $textBrush3 = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10, 10, 10))
-          $g2.DrawString("s", $font3, $textBrush3, 14, 12)
+          $b2 = New-Object System.Drawing.Bitmap(55, 55)
+          $g2 = [System.Drawing.Graphics]::FromImage($b2)
+          $g2.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+          $g2.Clear([System.Drawing.Color]::FromArgb(10,10,10))
+          $br2 = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            [System.Drawing.Point]::new(0,0), [System.Drawing.Point]::new(55,55),
+            [System.Drawing.Color]::FromArgb(212,160,255),
+            [System.Drawing.Color]::FromArgb(124,92,191))
+          $g2.FillEllipse($br2, 4, 4, 47, 47)
+          $f3 = New-Object System.Drawing.Font("Segoe UI", 20, [System.Drawing.FontStyle]::Bold)
+          $g2.DrawString("s", $f3, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10,10,10))), 12, 10)
           $g2.Dispose()
-          $bmp2.Save("cobalt-app/installer/wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
-          $bmp2.Dispose()
+          $b2.Save("installer/wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+          $b2.Dispose()
+          Write-Host "Artwork generated"
 
-          Write-Host "✓ Installer bitmaps generated"
-
-      - name: Build custom Inno Setup installer
+      - name: Build custom installer
+        id: installer
         shell: pwsh
         run: |
-          $nsisExe = "${{ steps.artifacts.outputs.NSIS_PATH }}"
-          $version  = "${{ steps.version.outputs.VERSION }}"
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $nsisExe = "${{ steps.nsis.outputs.PATH }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
 
-          # Patch the .iss to point at the actual built NSIS exe
-          $iss = Get-Content cobalt-app/installer/installer.iss -Raw
-          $iss = $iss -replace '#define SetupExe.*', "#define SetupExe `"$nsisExe`""
-          $iss | Set-Content cobalt-app/installer/installer.iss
-
-          # Create output dir
-          New-Item -ItemType Directory -Force -Path cobalt-app/dist | Out-Null
-
-          # Run Inno Setup compiler
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
             /DAppVersion=$version `
-            /O"cobalt-app/dist" `
+            /DNsisExe="$nsisExe" `
+            /O"dist" `
             /F"santi.tools-$version-setup" `
-            "cobalt-app/installer/installer.iss"
+            "installer/installer.iss"
 
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
-          Write-Host "✓ Custom installer built"
 
-      - name: List final artifacts
+          $out = Resolve-Path "dist/santi.tools-$version-setup.exe"
+          Write-Host "Installer: $out ($([math]::Round((Get-Item $out).Length/1MB,1)) MB)"
+          echo "PATH=$out" >> $env:GITHUB_OUTPUT
+
+      - name: Read changelog
+        id: changelog
         shell: pwsh
         run: |
-          Write-Host "=== Release artifacts ==="
-          Get-ChildItem cobalt-app/dist -Filter "*.exe" | ForEach-Object {
-            Write-Host "  $($_.Name)  ($([math]::Round($_.Length/1MB, 2)) MB)"
+          $ver   = "${{ steps.version.outputs.VERSION }}"
+          $lines = Get-Content CHANGELOG.md
+          $cap   = $false
+          $notes = [System.Collections.Generic.List[string]]::new()
+          foreach ($line in $lines) {
+            if ($line -match "^## \[$([regex]::Escape($ver))\]") { $cap = $true; continue }
+            if ($cap -and $line -match "^## \[") { break }
+            if ($cap) { $notes.Add($line) }
           }
+          $body = ($notes -join "`n").Trim()
+          if (-not $body) { $body = "see commits for changes." }
+          Set-Content release-notes.md $body
+          Write-Host "Release notes written"
 
-      # ── GitHub Release ────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || steps.version.outputs.TAG }}
+          tag_name: ${{ github.ref_name }}
           name: "santi.tools v${{ steps.version.outputs.VERSION }}"
+          body_path: release-notes.md
           draft: false
           prerelease: false
-          generate_release_notes: true
-          body: |
-            ## santi.tools v${{ steps.version.outputs.VERSION }}
-
-            ### install
-            download **`santi.tools-${{ steps.version.outputs.VERSION }}-setup.exe`** and run it.
-
-            - no admin rights needed — installs to your user folder
-            - creates a desktop shortcut automatically
-            - includes yt-dlp for YouTube fallback downloads
-
-            > requires windows 10 x64 or later
-
-            ---
-            *built automatically by github actions*
-          files: |
-            cobalt-app/dist/santi.tools-${{ steps.version.outputs.VERSION }}-setup.exe
-            ${{ steps.artifacts.outputs.NSIS_PATH }}
-            ${{ steps.artifacts.outputs.MSI_PATH }}
+          files: dist/santi.tools-${{ steps.version.outputs.VERSION }}-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -72,3 +72,37 @@ generate a key:
 ```powershell
 bun tauri signer generate -w ~/.tauri/santi-tools.key
 ```
+
+---
+
+## nest.rip OAuth setup
+
+your OAuth app is already registered at nest.rip with client ID `a8b00d4a-652c-4301-a7d6-3764be0d9e2e`.
+
+the redirect URI `santi-tools://auth/callback` must be added in the nest.rip app settings.
+
+**add this secret to your GitHub repo** (Settings → Secrets → Actions → New repository secret):
+
+| secret | value |
+|--------|-------|
+| `NEST_CLIENT_SECRET` | the client secret from your nest.rip app (`hDsRyASZdF1JaX4hYHR2FjG1pP5NClIM`) |
+
+the client secret is baked into the Rust binary at build time via `env!("NEST_CLIENT_SECRET")` — it never touches the frontend JS.
+
+to enable the deep link so the OS routes `santi-tools://auth/callback` back into the app, add this to `tauri.conf.json` under `"app"`:
+
+```json
+"deepLinkProtocols": ["santi-tools"]
+```
+
+and add `tauri-plugin-deep-link` to `Cargo.toml`:
+
+```toml
+tauri-plugin-deep-link = "2"
+```
+
+then register it in `lib.rs`:
+
+```rust
+.plugin(tauri_plugin_deep_link::init())
+```

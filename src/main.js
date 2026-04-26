@@ -473,12 +473,20 @@ const btnSettings = document.getElementById('btn-settings');
 const btnDonate = document.getElementById('btn-donate');
 const btnUpdates = document.getElementById('btn-updates');
 const btnAbout = document.getElementById('btn-about');
+const btnHistory = document.getElementById('btn-history');
+const btnCompress = document.getElementById('btn-compress');
+const btnNotes = document.getElementById('btn-notes');
+const btnImghost = document.getElementById('btn-imghost');
 
 const viewSave = document.getElementById('view-save');
 const viewRemix = document.getElementById('view-remix');
 const viewSettings = document.getElementById('view-settings');
 const viewUpdates = document.getElementById('view-updates');
 const viewAbout = document.getElementById('view-about');
+const viewHistory = document.getElementById('view-history');
+const viewCompress = document.getElementById('view-compress');
+const viewNotes = document.getElementById('view-notes');
+const viewImghost = document.getElementById('view-imghost');
 
 const urlInput = document.getElementById('url-input');
 const btnPaste = document.getElementById('btn-paste');
@@ -509,16 +517,18 @@ let queueItems = [];
 sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('expanded'));
 
 // ===== View Switching =====
-const allNavButtons = [btnSave, btnRemix, btnSettings, btnUpdates, btnAbout];
-const views = { save: viewSave, remix: viewRemix, settings: viewSettings, updates: viewUpdates, about: viewAbout };
+const allNavButtons = [btnSave, btnRemix, btnSettings, btnUpdates, btnAbout, btnHistory, btnCompress, btnNotes, btnImghost];
+const views = { save: viewSave, remix: viewRemix, settings: viewSettings, updates: viewUpdates, about: viewAbout, history: viewHistory, compress: viewCompress, notes: viewNotes, imghost: viewImghost };
 
 function switchView(viewName, activeBtn) {
     allNavButtons.forEach(b => b.classList.remove('active'));
     activeBtn.classList.add('active');
     Object.values(views).forEach(v => v.classList.remove('active'));
     if (views[viewName]) views[viewName].classList.add('active');
-    // Load updates content when switching to updates view
     if (viewName === 'updates') loadUpdates();
+    if (viewName === 'history') renderHistory();
+    if (viewName === 'notes') renderNotesList();
+    if (viewName === 'imghost') imghostInit();
 }
 
 btnSave.addEventListener('click', () => switchView('save', btnSave));
@@ -526,6 +536,10 @@ btnRemix.addEventListener('click', () => switchView('remix', btnRemix));
 btnSettings.addEventListener('click', () => switchView('settings', btnSettings));
 btnUpdates.addEventListener('click', () => switchView('updates', btnUpdates));
 btnAbout.addEventListener('click', () => switchView('about', btnAbout));
+btnHistory.addEventListener('click', () => switchView('history', btnHistory));
+btnCompress.addEventListener('click', () => switchView('compress', btnCompress));
+btnNotes.addEventListener('click', () => switchView('notes', btnNotes));
+btnImghost.addEventListener('click', () => switchView('imghost', btnImghost));
 
 // ===== Mode Buttons =====
 modeButtons.forEach(btn => {
@@ -702,6 +716,7 @@ async function startDownload(url, filename, queueId, originalUrl, isFallback = f
         }
         showStatus(`saved to: ${savedPath}`, 'success');
         if (queueId) updateQueueItem(queueId, 'done', filename);
+        addHistoryEntry({ filename, path: savedPath, source: originalUrl || url, ts: Date.now() });
         // Track storage used
         try {
             const { stat } = window.__TAURI__?.fs || {};
@@ -732,6 +747,7 @@ async function startYtDlpFallback(originalUrl, filename, queueId, savePath = nul
         });
         showStatus(`saved via fallback: ${savedPath}`, 'success');
         if (queueId) updateQueueItem(queueId, 'done', filename);
+        addHistoryEntry({ filename, path: savedPath, source: originalUrl || url, ts: Date.now() });
         try {
             const { stat } = window.__TAURI__?.fs || {};
             if (stat) { const info = await stat(savedPath); addStorageUsed(getCurrentSession(), info.size || 0); }
@@ -821,13 +837,50 @@ function renderQueue() {
 }
 
 // Ensure the open function is available for service chips
+const SERVICE_URLS = {
+    'youtube':      'https://youtube.com',
+    'youtubemusic': 'https://music.youtube.com',
+    'twitter':      'https://twitter.com',
+    'x':            'https://x.com',
+    'tiktok':       'https://tiktok.com',
+    'instagram':    'https://instagram.com',
+    'reddit':       'https://reddit.com',
+    'soundcloud':   'https://soundcloud.com',
+    'spotify':      'https://spotify.com',
+    'twitch':       'https://twitch.tv',
+    'vimeo':        'https://vimeo.com',
+    'bilibili':     'https://bilibili.com',
+    'rutube':       'https://rutube.ru',
+    'vk':           'https://vk.com',
+    'ok':           'https://ok.ru',
+    'dailymotion':  'https://dailymotion.com',
+    'facebook':     'https://facebook.com',
+    'pinterest':    'https://pinterest.com',
+    'tumblr':       'https://tumblr.com',
+    'streamable':   'https://streamable.com',
+    'mixcloud':     'https://mixcloud.com',
+    'bandcamp':     'https://bandcamp.com',
+    'nicovideo':    'https://nicovideo.jp',
+    'niconico':     'https://nicovideo.jp',
+    'loom':         'https://loom.com',
+    'vine':         'https://vine.co',
+    'coub':         'https://coub.com',
+    'odnoklassniki':'https://ok.ru',
+    'xiaohongshu':  'https://xiaohongshu.com',
+    'snapchat':     'https://snapchat.com',
+    'bluesky':      'https://bsky.app',
+    'bsky':         'https://bsky.app',
+};
+
 window.openServiceUrl = async (serviceName) => {
+    const key = serviceName.toLowerCase().trim();
+    const url = SERVICE_URLS[key]
+        ?? (serviceName.includes('.') ? `https://${serviceName}` : `https://${serviceName}.com`);
     try {
         const { open } = window.__TAURI__.opener || await import('@tauri-apps/plugin-opener');
-        const url = serviceName.includes('.') ? `https://${serviceName}` : `https://${serviceName}.com`;
         await open(url);
     } catch (err) {
-        window.open(`https://${serviceName}.com`, '_blank');
+        window.open(url, '_blank');
     }
 };
 
@@ -1089,3 +1142,691 @@ document.getElementById('btn-clear-cache')?.addEventListener('click', () => {
 // ===== Init =====
 loadSettings();
 urlInput.focus();
+
+// =====================================================
+// ===== HISTORY =======================================
+// =====================================================
+
+const HISTORY_KEY = (u) => `santi-tools-history-${u}`;
+const MAX_HISTORY = 200;
+
+function getHistory() {
+    const u = getCurrentSession();
+    if (!u) return [];
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY(u)) || '[]'); }
+    catch { return []; }
+}
+
+function saveHistory(items) {
+    const u = getCurrentSession();
+    if (!u) return;
+    localStorage.setItem(HISTORY_KEY(u), JSON.stringify(items.slice(0, MAX_HISTORY)));
+}
+
+function addHistoryEntry(entry) {
+    const items = getHistory();
+    items.unshift(entry);
+    saveHistory(items);
+}
+
+function getFileIcon(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    if (['mp4','mov','webm','mkv','avi'].includes(ext))
+        return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>`;
+    if (['mp3','ogg','opus','wav','flac','m4a'].includes(ext))
+        return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+    if (['jpg','jpeg','png','gif','webp'].includes(ext))
+        return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+}
+
+function renderHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    const items = getHistory();
+    if (items.length === 0) {
+        list.innerHTML = `<div class="history-empty"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>no downloads yet</p></div>`;
+        return;
+    }
+    list.innerHTML = items.map((item, i) => {
+        const date = new Date(item.ts);
+        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        const domain = (() => { try { return new URL(item.source || '').hostname.replace('www.', ''); } catch { return item.source || ''; } })();
+        return `<div class="history-item">
+            <div class="history-item-icon">${getFileIcon(item.filename)}</div>
+            <div class="history-item-info">
+                <span class="history-item-name" title="${item.path || ''}">${item.filename || 'unknown'}</span>
+                <span class="history-item-meta">${domain} · ${dateStr} ${timeStr}</span>
+            </div>
+            <button class="history-item-delete" onclick="deleteHistoryEntry(${i})" title="Remove">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>`;
+    }).join('');
+}
+
+window.deleteHistoryEntry = (index) => {
+    const items = getHistory();
+    items.splice(index, 1);
+    saveHistory(items);
+    renderHistory();
+};
+
+document.getElementById('btn-clear-history')?.addEventListener('click', () => {
+    if (!confirm('Clear all download history?')) return;
+    const u = getCurrentSession();
+    if (u) localStorage.removeItem(HISTORY_KEY(u));
+    renderHistory();
+});
+
+// =====================================================
+// ===== COMPRESSOR ====================================
+// =====================================================
+
+let compressFiles = [];
+
+const compressDropzone = document.getElementById('compress-dropzone');
+const compressFileInput = document.getElementById('compress-file-input');
+const compressQueue = document.getElementById('compress-queue');
+const compressRunBtn = document.getElementById('btn-compress-run');
+
+compressDropzone?.addEventListener('dragover', (e) => { e.preventDefault(); compressDropzone.classList.add('dragover'); });
+compressDropzone?.addEventListener('dragleave', () => compressDropzone.classList.remove('dragover'));
+compressDropzone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    compressDropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) addCompressFiles(e.dataTransfer.files);
+});
+compressFileInput?.addEventListener('change', () => {
+    if (compressFileInput.files.length) addCompressFiles(compressFileInput.files);
+});
+
+function addCompressFiles(fileList) {
+    for (const f of fileList) {
+        if (!compressFiles.find(x => x.name === f.name && x.size === f.size)) {
+            compressFiles.push({ file: f, name: f.name, size: f.size, status: 'pending' });
+        }
+    }
+    renderCompressQueue();
+}
+
+function renderCompressQueue() {
+    if (!compressQueue) return;
+    if (compressFiles.length === 0) {
+        compressQueue.classList.add('hidden');
+        compressRunBtn.disabled = true;
+        return;
+    }
+    compressQueue.classList.remove('hidden');
+    compressRunBtn.disabled = false;
+    compressQueue.innerHTML = compressFiles.map((item, i) => {
+        const sizeMB = (item.size / 1024 / 1024).toFixed(2);
+        const statusClass = item.status === 'done' ? 'success' : item.status === 'error' ? 'error' : item.status === 'working' ? 'loading' : '';
+        const statusText = item.status === 'done' ? 'done' : item.status === 'error' ? 'error' : item.status === 'working' ? '...' : `${sizeMB} MB`;
+        return `<div class="compress-queue-item">
+            <div class="compress-queue-info">
+                <span class="compress-queue-name">${item.name}</span>
+                <span class="compress-queue-size ${statusClass}">${statusText}</span>
+            </div>
+            <button class="compress-queue-remove" onclick="removeCompressFile(${i})" title="Remove">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>`;
+    }).join('');
+}
+
+window.removeCompressFile = (i) => {
+    compressFiles.splice(i, 1);
+    renderCompressQueue();
+};
+
+compressRunBtn?.addEventListener('click', async () => {
+    const quality = getSegValue('compressQuality') || 'balanced';
+    const qualityMap = { high: '28', balanced: '32', small: '38' }; // CRF values for ffmpeg
+    const crf = qualityMap[quality];
+
+    for (let i = 0; i < compressFiles.length; i++) {
+        const item = compressFiles[i];
+        if (item.status === 'done') continue;
+        item.status = 'working';
+        renderCompressQueue();
+
+        try {
+            // Use Tauri save dialog to pick output path
+            const ext = item.name.split('.').pop();
+            const baseName = item.name.replace(/\.[^.]+$/, '');
+            const outName = `${baseName}_compressed.${ext}`;
+
+            let savePath = null;
+            try {
+                const { save } = window.__TAURI__.dialog || await import('@tauri-apps/plugin-dialog');
+                savePath = await save({
+                    defaultPath: outName,
+                    filters: [{ name: 'Media', extensions: [ext] }, { name: 'All Files', extensions: ['*'] }],
+                    title: `Save compressed: ${item.name}`,
+                });
+            } catch (_) {}
+
+            if (!savePath) { item.status = 'pending'; renderCompressQueue(); continue; }
+
+            // Read file as array buffer, write to temp, then invoke ffmpeg via yt-dlp shell
+            // Since we don't have ffmpeg as a sidecar, we use the system ffmpeg if available
+            // and fall back to a canvas-based image compressor for images
+            const fileExt = ext.toLowerCase();
+            const isImage = ['jpg','jpeg','png','webp','gif'].includes(fileExt);
+
+            if (isImage) {
+                // Canvas-based image compression
+                const dataUrl = await new Promise((res, rej) => {
+                    const reader = new FileReader();
+                    reader.onload = e => res(e.target.result);
+                    reader.onerror = rej;
+                    reader.readAsDataURL(item.file);
+                });
+                const img = await new Promise((res, rej) => {
+                    const i = new Image();
+                    i.onload = () => res(i);
+                    i.onerror = rej;
+                    i.src = dataUrl;
+                });
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const qualityVal = quality === 'high' ? 0.9 : quality === 'balanced' ? 0.75 : 0.5;
+                const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', qualityVal));
+                const buf = await blob.arrayBuffer();
+                await invoke('write_file', { path: savePath, data: Array.from(new Uint8Array(buf)) });
+                item.status = 'done';
+            } else {
+                // Video/audio: invoke ffmpeg via shell
+                await invoke('compress_with_ffmpeg', {
+                    inputPath: item.file.path || item.name,
+                    outputPath: savePath,
+                    crf,
+                });
+                item.status = 'done';
+            }
+        } catch (err) {
+            console.error('Compress error:', err);
+            item.status = 'error';
+        }
+        renderCompressQueue();
+    }
+});
+
+// =====================================================
+// ===== NOTES =========================================
+// =====================================================
+
+const NOTES_KEY = (u) => `santi-tools-notes-${u}`;
+let activeNoteId = null;
+let notesSaveTimer = null;
+
+function getNotes() {
+    const u = getCurrentSession();
+    if (!u) return [];
+    try { return JSON.parse(localStorage.getItem(NOTES_KEY(u)) || '[]'); }
+    catch { return []; }
+}
+
+function saveNotes(notes) {
+    const u = getCurrentSession();
+    if (!u) return;
+    localStorage.setItem(NOTES_KEY(u), JSON.stringify(notes));
+}
+
+function createNote() {
+    const notes = getNotes();
+    const note = { id: Date.now().toString(), title: '', body: '', updatedAt: Date.now() };
+    notes.unshift(note);
+    saveNotes(notes);
+    return note;
+}
+
+function renderNotesList() {
+    const list = document.getElementById('notes-list');
+    if (!list) return;
+    const notes = getNotes();
+    if (notes.length === 0) {
+        list.innerHTML = `<div class="notes-list-empty">no notes yet</div>`;
+        return;
+    }
+    list.innerHTML = notes.map(n => {
+        const preview = n.body ? n.body.replace(/\n/g, ' ').slice(0, 60) : 'empty note';
+        const date = new Date(n.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const isActive = n.id === activeNoteId;
+        return `<div class="notes-list-item ${isActive ? 'active' : ''}" onclick="openNote('${n.id}')">
+            <span class="notes-list-title">${n.title || 'untitled'}</span>
+            <span class="notes-list-preview">${date} · ${preview}</span>
+        </div>`;
+    }).join('');
+}
+
+window.openNote = (id) => {
+    activeNoteId = id;
+    const notes = getNotes();
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+
+    document.getElementById('notes-empty-state')?.classList.add('hidden');
+    const editor = document.getElementById('notes-editor');
+    editor?.classList.remove('hidden');
+
+    document.getElementById('note-title-input').value = note.title;
+    document.getElementById('note-body-input').value = note.body;
+    document.getElementById('note-meta').textContent =
+        `last edited ${new Date(note.updatedAt).toLocaleString()}`;
+
+    renderNotesList();
+};
+
+function saveActiveNote() {
+    if (!activeNoteId) return;
+    const notes = getNotes();
+    const note = notes.find(n => n.id === activeNoteId);
+    if (!note) return;
+    note.title = document.getElementById('note-title-input').value;
+    note.body = document.getElementById('note-body-input').value;
+    note.updatedAt = Date.now();
+    // Move to top
+    const idx = notes.indexOf(note);
+    if (idx > 0) { notes.splice(idx, 1); notes.unshift(note); }
+    saveNotes(notes);
+    document.getElementById('note-meta').textContent =
+        `last edited ${new Date(note.updatedAt).toLocaleString()}`;
+    renderNotesList();
+}
+
+// Auto-save on input with debounce
+['note-title-input', 'note-body-input'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+        clearTimeout(notesSaveTimer);
+        notesSaveTimer = setTimeout(saveActiveNote, 600);
+    });
+});
+
+document.getElementById('btn-new-note')?.addEventListener('click', () => {
+    const note = createNote();
+    openNote(note.id);
+});
+
+// Delete note with Ctrl+Delete or a delete button we'll add dynamically
+document.getElementById('note-body-input')?.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Delete') {
+        if (!activeNoteId) return;
+        if (!confirm('Delete this note?')) return;
+        const notes = getNotes().filter(n => n.id !== activeNoteId);
+        saveNotes(notes);
+        activeNoteId = null;
+        document.getElementById('notes-editor')?.classList.add('hidden');
+        document.getElementById('notes-empty-state')?.classList.remove('hidden');
+        renderNotesList();
+    }
+});
+
+
+// =====================================================
+// ===== IMAGE HOST (nest.rip) =========================
+// =====================================================
+
+// Your nest.rip OAuth app credentials
+const NEST_CLIENT_ID     = 'a8b00d4a-652c-4301-a7d6-3764be0d9e2e';
+const NEST_REDIRECT_URI  = 'santi-tools://auth/callback';
+const NEST_SCOPES        = 'identify uploads.read uploads.write openid';
+
+const IMGHOST_TOKEN_KEY  = 'santi-tools-nest-token';
+const IMGHOST_KEY_MANUAL = 'santi-tools-nestkey';
+const IMGHOST_FILES_KEY  = (u) => `santi-tools-hosted-${u}`;
+
+// ── Token helpers ─────────────────────────────────────
+
+function getNestToken() {
+    // OAuth access token takes priority, fall back to manual API key
+    return localStorage.getItem(IMGHOST_TOKEN_KEY)
+        || localStorage.getItem(IMGHOST_KEY_MANUAL)
+        || '';
+}
+
+function saveNestToken(token) {
+    localStorage.setItem(IMGHOST_TOKEN_KEY, token.trim());
+}
+
+function clearNestToken() {
+    localStorage.removeItem(IMGHOST_TOKEN_KEY);
+}
+
+function saveNestKey(key) {
+    localStorage.setItem(IMGHOST_KEY_MANUAL, key.trim());
+}
+
+// ── Hosted files storage ──────────────────────────────
+
+function getHostedFiles() {
+    const u = getCurrentSession();
+    if (!u) return [];
+    try { return JSON.parse(localStorage.getItem(IMGHOST_FILES_KEY(u)) || '[]'); }
+    catch { return []; }
+}
+
+function saveHostedFiles(files) {
+    const u = getCurrentSession();
+    if (!u) return;
+    localStorage.setItem(IMGHOST_FILES_KEY(u), JSON.stringify(files));
+}
+
+// ── Init / render state ───────────────────────────────
+
+async function imghostInit() {
+    const token = getNestToken();
+    const setup   = document.getElementById('imghost-setup');
+    const userBar = document.getElementById('imghost-user-bar');
+    const drop    = document.getElementById('imghost-drop');
+    const keyInput = document.getElementById('imghost-api-key');
+
+    if (keyInput) keyInput.value = localStorage.getItem(IMGHOST_KEY_MANUAL) || '';
+
+    if (!token) {
+        setup?.classList.remove('hidden');
+        userBar?.classList.add('hidden');
+        drop?.classList.add('dimmed');
+    } else {
+        setup?.classList.add('hidden');
+        drop?.classList.remove('dimmed');
+        // Fetch user info to show in the bar
+        try {
+            const resp = await fetch('https://nest.rip/api/oauth/userinfo', {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (resp.ok) {
+                const user = await resp.json();
+                userBar?.classList.remove('hidden');
+                const nameEl   = document.getElementById('imghost-user-name');
+                const avatarEl = document.getElementById('imghost-user-avatar');
+                if (nameEl)   nameEl.textContent = user.username || user.name || 'nest.rip user';
+                if (avatarEl && user.avatar) { avatarEl.src = user.avatar; avatarEl.style.display = ''; }
+                else if (avatarEl) avatarEl.style.display = 'none';
+
+                // Fetch quota
+                const infoResp = await fetch('https://nest.rip/api/files/info', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (infoResp.ok) {
+                    const info = await infoResp.json();
+                    const quotaEl = document.getElementById('imghost-quota');
+                    if (quotaEl && info.usedQuota != null && info.maxQuota != null) {
+                        quotaEl.textContent = `${formatBytes(info.usedQuota)} / ${formatBytes(info.maxQuota)}`;
+                    }
+                }
+            } else {
+                // Token expired or invalid — clear it
+                clearNestToken();
+                imghostInit();
+                return;
+            }
+        } catch (_) {
+            userBar?.classList.add('hidden');
+        }
+    }
+
+    renderHostedGrid();
+}
+
+// ── OAuth flow ────────────────────────────────────────
+
+async function startNestOAuth() {
+    const state = generateSalt();
+    sessionStorage.setItem('nest-oauth-state', state);
+
+    const params = new URLSearchParams({
+        client_id:     NEST_CLIENT_ID,
+        redirect_uri:  NEST_REDIRECT_URI,
+        response_type: 'code',
+        scope:         NEST_SCOPES,
+        state,
+    });
+
+    const authUrl = `https://nest.rip/oauth/authorize?${params}`;
+
+    try {
+        const { open } = window.__TAURI__.opener || await import('@tauri-apps/plugin-opener');
+        await open(authUrl);
+    } catch (err) {
+        console.error('Failed to open nest.rip OAuth:', err);
+    }
+}
+
+// Listen for the deep-link callback (santi-tools://auth/callback#access_token=... or ?code=...)
+window.__TAURI__?.event?.listen('deep-link://new-url', async (event) => {
+    const url = Array.isArray(event.payload) ? event.payload[0] : event.payload;
+    if (!url.includes('auth/callback')) return;
+
+    // Try fragment (implicit) first, then query string (auth code)
+    const frag  = url.includes('#') ? url.split('#')[1] : '';
+    const query = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
+    const fragParams  = new URLSearchParams(frag);
+    const queryParams = new URLSearchParams(query);
+
+    const accessToken = fragParams.get('access_token');
+    const code        = queryParams.get('code');
+    const state       = queryParams.get('state') || fragParams.get('state');
+    const savedState  = sessionStorage.getItem('nest-oauth-state');
+
+    if (savedState && state && state !== savedState) {
+        console.warn('nest.rip OAuth state mismatch');
+        return;
+    }
+    sessionStorage.removeItem('nest-oauth-state');
+
+    if (accessToken) {
+        saveNestToken(accessToken);
+        imghostInit();
+        return;
+    }
+
+    if (code) {
+        try {
+            const accessToken = await invoke('nest_exchange_code', { code });
+            saveNestToken(accessToken);
+            imghostInit();
+        } catch (err) {
+            console.error('nest.rip token exchange failed:', err);
+        }
+    }
+});
+
+// ── Button wiring ─────────────────────────────────────
+
+document.getElementById('imghost-oauth-btn')?.addEventListener('click', startNestOAuth);
+
+document.getElementById('imghost-disconnect')?.addEventListener('click', () => {
+    clearNestToken();
+    imghostInit();
+});
+
+document.getElementById('imghost-save-key')?.addEventListener('click', () => {
+    const val = document.getElementById('imghost-api-key')?.value.trim();
+    if (!val) return;
+    saveNestKey(val);
+    // If no OAuth token, use this as the active credential
+    if (!localStorage.getItem(IMGHOST_TOKEN_KEY)) {
+        imghostInit();
+    }
+});
+
+// ── Drag & drop upload ────────────────────────────────
+
+const imghostDrop  = document.getElementById('imghost-drop');
+const imghostInput = document.getElementById('imghost-file-input');
+
+imghostDrop?.addEventListener('dragover', (e) => { e.preventDefault(); imghostDrop.classList.add('dragover'); });
+imghostDrop?.addEventListener('dragleave', () => imghostDrop.classList.remove('dragover'));
+imghostDrop?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    imghostDrop.classList.remove('dragover');
+    if (e.dataTransfer.files.length) uploadToNest(e.dataTransfer.files);
+});
+imghostInput?.addEventListener('change', () => {
+    if (imghostInput.files.length) uploadToNest(imghostInput.files);
+    imghostInput.value = '';
+});
+
+async function uploadToNest(fileList) {
+    const token = getNestToken();
+    if (!token) {
+        document.getElementById('imghost-setup')?.classList.remove('hidden');
+        return;
+    }
+
+    for (const file of fileList) {
+        const tempId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        addHostedCard({ id: tempId, fileName: file.name, uploading: true });
+
+        try {
+            const form = new FormData();
+            form.append('file', file);
+
+            const resp = await fetch('https://nest.rip/api/files/upload', {
+                method: 'POST',
+                headers: { 'Authorization': token },
+                body: form,
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${resp.status}`);
+            }
+
+            const data = await resp.json();
+            const files = getHostedFiles().filter(f => f.id !== tempId);
+            files.unshift({
+                id:            data.fileName,
+                fileName:      data.fileName,
+                fileURL:       data.fileURL,
+                accessibleURL: data.accessibleURL || data.fileURL,
+                deletionURL:   data.deletionURL,
+                uploadedAt:    Date.now(),
+            });
+            saveHostedFiles(files);
+            renderHostedGrid();
+        } catch (err) {
+            updateHostedCard(tempId, { uploading: false, error: String(err) });
+        }
+    }
+}
+
+// ── Card helpers ──────────────────────────────────────
+
+function addHostedCard(file) {
+    const files = getHostedFiles();
+    files.unshift(file);
+    saveHostedFiles(files);
+    renderHostedGrid();
+}
+
+function updateHostedCard(id, patch) {
+    const files = getHostedFiles();
+    const idx = files.findIndex(f => f.id === id);
+    if (idx !== -1) { Object.assign(files[idx], patch); saveHostedFiles(files); }
+    renderHostedGrid();
+}
+
+// ── Grid renderer ─────────────────────────────────────
+
+function renderHostedGrid() {
+    const grid = document.getElementById('imghost-grid');
+    if (!grid) return;
+    const files = getHostedFiles();
+
+    if (files.length === 0) {
+        grid.innerHTML = `<div class="imghost-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p>nothing uploaded yet</p>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = files.map(f => {
+        if (f.uploading) return `
+            <div class="imghost-card uploading" data-id="${f.id}">
+                <div class="imghost-card-thumb"><span class="spinner"></span></div>
+                <div class="imghost-card-name">${f.fileName}</div>
+            </div>`;
+
+        if (f.error) return `
+            <div class="imghost-card error" data-id="${f.id}">
+                <div class="imghost-card-thumb error-thumb">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="imghost-card-name" title="${f.error}">${f.fileName}</div>
+                <div class="imghost-card-error">${f.error}</div>
+                <button class="imghost-card-del" onclick="removeHostedCard('${f.id}')" title="Remove">×</button>
+            </div>`;
+
+        const isImage = /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.fileName);
+        const thumb = isImage
+            ? `<img src="${f.accessibleURL}" alt="${f.fileName}" loading="lazy" />`
+            : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+        const safeUrl = (f.accessibleURL || '').replace(/'/g, '%27');
+        const safeDel = (f.deletionURL   || '').replace(/'/g, '%27');
+
+        return `
+            <div class="imghost-card" data-id="${f.id}">
+                <div class="imghost-card-thumb">${thumb}</div>
+                <div class="imghost-card-name" title="${f.fileName}">${f.fileName}</div>
+                <div class="imghost-card-actions">
+                    <button class="imghost-card-btn" onclick="copyHostedUrl('${safeUrl}')" title="Copy link">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    </button>
+                    <button class="imghost-card-btn" onclick="openHostedUrl('${safeUrl}')" title="Open">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </button>
+                    <button class="imghost-card-btn danger" onclick="deleteHostedFile('${f.id}','${safeDel}')" title="Delete">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// ── Global actions ────────────────────────────────────
+
+window.copyHostedUrl = async (url) => {
+    try {
+        await navigator.clipboard.writeText(url);
+        showStatus('link copied!', 'success');
+        setTimeout(() => statusArea.classList.add('hidden'), 1500);
+    } catch (_) {}
+};
+
+window.openHostedUrl = async (url) => {
+    try {
+        const { open } = window.__TAURI__.opener || await import('@tauri-apps/plugin-opener');
+        await open(url);
+    } catch (_) { window.open(url, '_blank'); }
+};
+
+window.removeHostedCard = (id) => {
+    saveHostedFiles(getHostedFiles().filter(f => f.id !== id));
+    renderHostedGrid();
+};
+
+window.deleteHostedFile = async (id, deletionURL) => {
+    if (!confirm('Delete this file from nest.rip?')) return;
+    if (deletionURL) {
+        try { await fetch(deletionURL); } catch (_) {}
+    } else {
+        const token = getNestToken();
+        if (token) {
+            try {
+                await fetch(`https://nest.rip/api/files/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': token },
+                });
+            } catch (_) {}
+        }
+    }
+    removeHostedCard(id);
+};
