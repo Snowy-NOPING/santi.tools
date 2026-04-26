@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>santi.tools</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-brand">
+                <h1 class="auth-brand-text">santi.tools</h1>
+                <div class="auth-brand-glow"></div>
+            </div>
+            <p class="auth-subtitle" id="auth-subtitle">welcome back</p>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form" autocomplete="off">
+                <div class="auth-input-group">
+                    <label class="auth-label" for="login-username">username</label>
+                    <div class="auth-input-wrapper">
+                        <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <input id="login-username" type="text" placeholder="enter your username" spellcheck="false" autocomplete="off" required />
+                    </div>
+                </div>
+                <div class="auth-input-group">
+                    <label class="auth-label" for="login-password">password</label>
+                    <div class="auth-input-wrapper">
+                        <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                        <input id="login-password" type="password" placeholder="enter your password" autocomplete="off" required />
+                    </div>
+                </div>
+                <div id="login-error" class="auth-error hidden"></div>
+                <button type="submit" class="auth-submit-btn">
+                    <span>sign in</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <div class="auth-divider"><span>or</span></div>
+                <button type="button" id="btn-google-login" class="auth-google-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    <span>continue with google</span>
+                </button>
+                <p class="auth-switch">don't have an account? <a href="#" id="show-register">create one</a></p>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form hidden" autocomplete="off">
+                <div class="auth-input-group">
+                    <label class="auth-label" for="reg-username">username</label>
+                    <div class="auth-input-wrapper">
+                        <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <input id="reg-username" type="text" placeholder="choose a username" spellcheck="false" autocomplete="off" required minlength="3" />
+                    </div>
+                </div>
+                <div class="auth-input-group">
+                    <label class="auth-label" for="reg-password">password</label>
+                    <div class="auth-input-wrapper">
+                        <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                        <input id="reg-password" type="password" placeholder="choose a password" autocomplete="off" required minlength="4" />
+                    </div>
+                    <div class="auth-password-strength" id="password-strength">
+                        <div class="auth-strength-bar" id="strength-bar"></div>
+                    </div>
+                </div>
+                <div class="auth-input-group">
+                    <label class="auth-label" for="reg-confirm">confirm password</label>
+                    <div class="auth-input-wrapper">
+                        <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        <input id="reg-confirm" type="password" placeholder="re-enter your password" autocomplete="off" required />
+                    </div>
+                </div>
+                <div id="register-error" class="auth-error hidden"></div>
+                <button type="submit" class="auth-submit-btn">
+                    <span>create account</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <div class="auth-divider"><span>or</span></div>
+                <button type="button" id="btn-google-register" class="auth-google-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    <span>sign up with google</span>
+                </button>
+                <p class="auth-switch">already have an account? <a href="#" id="show-login">sign in</a></p>
+            </form>
+        </div>
+        <div class="auth-bg-orbs">
+            <div class="auth-orb auth-orb-1"></div>
+            <div class="auth-orb auth-orb-2"></div>
+            <div class="auth-orb auth-orb-3"></div>
+        </div>
+    </div>
+
+    <!-- Left Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-top">
+            <button id="btn-sidebar-toggle" class="sidebar-toggle" title="Toggle sidebar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>
+            </button>
+            <div class="sidebar-links-top">
+                <button id="btn-save" class="sidebar-btn active" title="Save">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span class="sidebar-label">save</span>
+                </button>
+                <button id="btn-remix" class="sidebar-btn" title="Remix">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                    <span class="sidebar-label">remix</span>
+                </button>
+            </div>
+        </div>
+        <div class="sidebar-bottom">
+            <div id="user-profile" class="sidebar-user-profile">
+                <div class="user-avatar" id="user-avatar" title="Click to change avatar" style="cursor:pointer;"></div>
+                <span class="sidebar-label user-name" id="user-display-name"></span>
+            </div>
+            <button id="btn-settings" class="sidebar-btn" title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span class="sidebar-label">settings</span>
+            </button>
+            <button id="btn-donate" class="sidebar-btn" title="Donate">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                <span class="sidebar-label">donate</span>
+            </button>
+            <button id="btn-updates" class="sidebar-btn" title="Updates">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span class="sidebar-label">updates</span>
+            </button>
+            <button id="btn-about" class="sidebar-btn" title="About">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span class="sidebar-label">about</span>
+            </button>
+            <button id="btn-logout" class="sidebar-btn sidebar-btn-logout" title="Logout">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span class="sidebar-label">logout</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-center">
+                <span class="topbar-sparkle">✦</span>
+                <span class="topbar-text">supported services</span>
+            </div>
+            <div class="topbar-right">
+                <button id="btn-queue" class="topbar-queue-btn" title="Processing queue">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </button>
+                <!-- Processing Queue Dropdown -->
+                <div id="queue-dropdown" class="queue-dropdown hidden">
+                    <div class="queue-header">
+                        <span class="queue-title">processing queue</span>
+                        <span class="queue-badge">BETA</span>
+                    </div>
+                    <div id="queue-body" class="queue-body">
+                        <p class="queue-empty">nothing here yet, just the two of us.<br>try downloading something!</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Save View (Main) -->
+        <section id="view-save" class="view active">
+            <div class="center-content">
+                <!-- Brand Text -->
+                <div class="brand-container">
+                    <h1 class="brand-text">santi.tools</h1>
+                    <div class="brand-glow"></div>
+                </div>
+
+                <!-- URL Input -->
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <span class="input-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        </span>
+                        <input id="url-input" type="text" placeholder="paste the link here" spellcheck="false" autocomplete="off" />
+                    </div>
+                </div>
+
+                <!-- Mode Buttons Row -->
+                <div class="controls-row">
+                    <div class="mode-buttons">
+                        <button id="mode-auto" class="mode-btn active" data-mode="auto">
+                            <span class="mode-emoji">🎬</span>
+                            <span>auto</span>
+                        </button>
+                        <button id="mode-audio" class="mode-btn" data-mode="audio">
+                            <span class="mode-emoji">🎶</span>
+                            <span>audio</span>
+                        </button>
+                        <button id="mode-mute" class="mode-btn" data-mode="mute">
+                            <span class="mode-emoji">🔇</span>
+                            <span>mute</span>
+                        </button>
+                    </div>
+                    <button id="btn-paste" class="paste-btn" title="Paste from clipboard">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                        <span>paste</span>
+                    </button>
+                </div>
+
+                <!-- Status / Result Area -->
+                <div id="status-area" class="status-area hidden">
+                    <div id="status-message" class="status-message"></div>
+                </div>
+
+                <!-- Picker Area (for multiple results) -->
+                <div id="picker-area" class="picker-area hidden"></div>
+            </div>
+        </section>
+
+        <!-- Remix View -->
+        <section id="view-remix" class="view">
+            <div class="center-content remix-layout">
+                <div class="remix-main">
+                    <!-- File Drop Zone -->
+                    <div id="remix-dropzone" class="remix-dropzone">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="remix-drop-icon">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="12" y2="12"/><line x1="15" y1="15" x2="12" y2="12"/>
+                        </svg>
+                        <p class="remix-drop-text">drag or select files</p>
+                        <p class="remix-drop-formats">supported formats: mp4, webm, mp3, ogg, opus, wav, m4a...</p>
+                        <input type="file" id="remix-file-input" multiple accept="video/*,audio/*" />
+                    </div>
+
+                    <!-- Remix Info Cards -->
+                    <div class="remix-info-cards">
+                        <div class="remix-info-card">
+                            <div class="remix-info-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="remix-info-title">what does remix do?</h3>
+                                <p class="remix-info-desc">remix fixes any issues with the file container, such as missing time info. it helps increase compatibility with old software, such as vegas pro and windows media player.</p>
+                            </div>
+                        </div>
+                        <div class="remix-info-card">
+                            <div class="remix-info-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="remix-info-title">how does it work?</h3>
+                                <p class="remix-info-desc">remuxing takes existing coded data and copies it over to a new media container. it's lossless: media data doesn't get re-encoded.</p>
+                            </div>
+                        </div>
+                        <div class="remix-info-card">
+                            <div class="remix-info-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="remix-info-title">on-device processing</h3>
+                                <p class="remix-info-desc">cobalt remuxes files locally. files never leave your device, so processing is nearly instant.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings View -->
+        <section id="view-settings" class="view">
+            <div class="stg-layout">
+                <!-- Settings Left Nav -->
+                <div class="stg-nav">
+                    <h2 class="stg-heading">settings</h2>
+                    <button class="stg-nav-btn active" data-stg-cat="video"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg> video</button>
+                    <button class="stg-nav-btn" data-stg-cat="audio"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> audio</button>
+                    <button class="stg-nav-btn" data-stg-cat="metadata"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> metadata</button>
+                    <button class="stg-nav-btn" data-stg-cat="instances"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> instances</button>
+                    <button class="stg-nav-btn" data-stg-cat="privacy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> privacy</button>
+                    <button class="stg-nav-btn" data-stg-cat="advanced"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> advanced</button>
+                </div>
+                <!-- Settings Right Content -->
+                <div class="stg-panels">
+                    <!-- VIDEO -->
+                    <div class="stg-panel active" data-stg-panel="video">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">video quality <span class="stg-link-icon">⊘</span></h3>
+                            <div class="seg-ctrl" data-setting="videoQuality">
+                                <button class="seg-btn" data-val="max">8k+</button><button class="seg-btn" data-val="2160">4k</button><button class="seg-btn" data-val="1440">1440p</button><button class="seg-btn active" data-val="1080">1080p</button><button class="seg-btn" data-val="720">720p</button><button class="seg-btn" data-val="480">480p</button><button class="seg-btn" data-val="360">360p</button><button class="seg-btn" data-val="240">240p</button><button class="seg-btn" data-val="144">144p</button>
+                            </div>
+                            <p class="stg-hint">if preferred video quality isn't available, next best is picked instead.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">preferred youtube video codec <span class="stg-link-icon">⊘</span></h3>
+                            <div class="seg-ctrl" data-setting="youtubeVideoCodec">
+                                <button class="seg-btn active" data-val="h264">h264 + aac</button><button class="seg-btn" data-val="av1">av1 + opus</button><button class="seg-btn" data-val="vp9">vp9 + opus</button>
+                            </div>
+                            <p class="stg-hint">h264: best compatibility, average quality. max quality is 1080p.<br>av1: best quality and efficiency. supports 8k & HDR.<br>vp9: same quality as av1, but file is ~2x bigger. supports 4k & HDR.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">high efficiency video codec <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>allow h265 for videos</span><label class="toggle"><input type="checkbox" id="setting-tiktok-h265" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">allows downloading videos from platforms like tiktok in higher quality at cost of compatibility.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">twitter/x <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>convert looping videos to GIF</span><label class="toggle"><input type="checkbox" id="setting-twitter-gif" checked /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">GIF conversion is inefficient, converted file may be obnoxiously big and low quality.</p>
+                        </div>
+                    </div>
+                    <!-- AUDIO -->
+                    <div class="stg-panel" data-stg-panel="audio">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">audio format <span class="stg-link-icon">⊘</span></h3>
+                            <div class="seg-ctrl" data-setting="audioFormat">
+                                <button class="seg-btn" data-val="best">best</button><button class="seg-btn active" data-val="mp3">mp3</button><button class="seg-btn" data-val="ogg">ogg</button><button class="seg-btn" data-val="wav">wav</button><button class="seg-btn" data-val="opus">opus</button>
+                            </div>
+                            <p class="stg-hint">all formats but "best" are converted from the source format, there will be some quality loss. when "best" format is selected, the audio is kept in its original format whenever possible.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">audio bitrate <span class="stg-link-icon">⊘</span></h3>
+                            <div class="seg-ctrl" data-setting="audioBitrate">
+                                <button class="seg-btn" data-val="320">320kb/s</button><button class="seg-btn" data-val="256">256kb/s</button><button class="seg-btn active" data-val="128">128kb/s</button><button class="seg-btn" data-val="96">96kb/s</button><button class="seg-btn" data-val="64">64kb/s</button><button class="seg-btn" data-val="8">8kb/s</button>
+                            </div>
+                            <p class="stg-hint">bitrate is applied only when converting audio to a lossy format. cobalt can't improve the source audio quality, so choosing a bitrate over 128kbps may inflate the file size with no audible difference.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">youtube audio track <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>prefer better quality</span><label class="toggle"><input type="checkbox" id="setting-yt-hls" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">cobalt will try to pick highest quality audio in audio mode. it may not be available depending on youtube's response, current traffic, and server status.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">tiktok <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>download original sound</span><label class="toggle"><input type="checkbox" id="setting-tiktok-full-audio" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">cobalt will download the sound from the video without any changes by the post's author.</p>
+                        </div>
+                    </div>
+                    <!-- METADATA -->
+                    <div class="stg-panel" data-stg-panel="metadata">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">filename style <span class="stg-link-icon">⊘</span></h3>
+                            <div class="seg-ctrl" data-setting="filenameStyle">
+                                <button class="seg-btn active" data-val="classic">classic</button><button class="seg-btn" data-val="basic">basic</button><button class="seg-btn" data-val="pretty">pretty</button><button class="seg-btn" data-val="nerdy">nerdy</button>
+                            </div>
+                            <!-- Filename preview -->
+                            <div class="fn-preview" id="fn-preview">
+                                <div class="fn-preview-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="fn-preview-icon"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                                    <div>
+                                        <span class="fn-preview-name" id="fn-preview-video">Video Title - Video Author (1080p, h264).mp4</span>
+                                        <span class="fn-preview-label">video file preview</span>
+                                    </div>
+                                </div>
+                                <div class="fn-preview-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="fn-preview-icon"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                    <div>
+                                        <span class="fn-preview-name" id="fn-preview-audio">Audio Title - Audio Author.opus</span>
+                                        <span class="fn-preview-label">audio file preview</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="stg-hint">filename style will only be used for files tunneled by cobalt. some services don't support filename styles other than classic.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">file metadata <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>disable file metadata</span><label class="toggle"><input type="checkbox" id="setting-disable-metadata" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">title, artist, and other info will not be added to the file.</p>
+                        </div>
+                    </div>
+                    <!-- INSTANCES -->
+                    <div class="stg-panel" data-stg-panel="instances">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">community instances <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>use a custom processing server</span><label class="toggle"><input type="checkbox" id="setting-custom-instance" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">cobalt will use a custom processing instance if you choose to. even though cobalt has some security measures in place, we are not responsible for any damages done via a community instance, as we have no control over them.</p>
+                            <p class="stg-hint">please be mindful of what instances you use and make sure they're hosted by people you trust.</p>
+                        </div>
+                        <div class="stg-section" id="custom-instance-url-section">
+                            <h3 class="stg-section-title">custom instance url <span class="stg-link-icon">⊘</span></h3>
+                            <input id="setting-api-url" class="stg-input" type="text" value="https://api.cobalt.tools" placeholder="https://api.cobalt.tools" />
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">instance access key <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>use an instance access key</span><label class="toggle"><input type="checkbox" id="setting-use-api-key" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">cobalt will use this key to make requests to the processing instance instead of other authentication methods. make sure the instance supports api keys!</p>
+                        </div>
+                        <div class="stg-section hidden" id="api-key-section">
+                            <h3 class="stg-section-title">access key</h3>
+                            <input id="setting-api-key" class="stg-input" type="password" value="" placeholder="your api key" />
+                        </div>
+                    </div>
+                    <!-- PRIVACY -->
+                    <div class="stg-panel" data-stg-panel="privacy">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">tunneling <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>always tunnel files</span><label class="toggle"><input type="checkbox" id="setting-always-proxy" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">cobalt will hide your ip address, browser info, and bypass local network restrictions. when enabled, files will also have readable filenames that otherwise would be gibberish.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">anonymous traffic analytics <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>don't contribute to analytics</span><label class="toggle"><input type="checkbox" id="setting-no-analytics" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">anonymous traffic analytics are needed to get an approximate number of active cobalt users. no identifiable information about you is ever stored. all processed data is anonymized and aggregated.</p>
+                        </div>
+                    </div>
+                    <!-- ADVANCED -->
+                    <div class="stg-panel" data-stg-panel="advanced">
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">debug <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-toggle-row"><span>enable features for nerds</span><label class="toggle"><input type="checkbox" id="setting-debug" /><span class="toggle-slider"></span></label></div>
+                            <p class="stg-hint">gives you easy access to app info that can be useful for debugging. enabling this does not affect functionality of cobalt in any way.</p>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">settings data <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-action-row">
+                                <button class="stg-action-btn" id="btn-import-settings"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> import</button>
+                                <button class="stg-action-btn" id="btn-export-settings"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> export</button>
+                                <button class="stg-action-btn danger" id="btn-reset-settings"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> reset</button>
+                            </div>
+                        </div>
+                        <div class="stg-section">
+                            <h3 class="stg-section-title">local storage <span class="stg-link-icon">⊘</span></h3>
+                            <div class="stg-action-row">
+                                <button class="stg-action-btn danger" id="btn-clear-cache"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> clear cache</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Updates View -->
+        <section id="view-updates" class="view">
+            <div class="updates-content">
+                <h2 class="updates-title">updates</h2>
+                <div id="updates-body" class="updates-body">
+                    <p class="updates-loading">loading updates...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- About View -->
+        <section id="view-about" class="view">
+            <div class="about-content">
+                <h2 class="about-title">about</h2>
+                <p class="about-text">
+                    <strong>santi.tools</strong> is a media downloader powered by the
+                    <a href="https://github.com/imputnet/cobalt" target="_blank" rel="noopener">cobalt</a> api.
+                </p>
+                <p class="about-text">
+                    paste a link from any supported service and download media in your preferred format and quality.
+                </p>
+                <div class="about-version">
+                    <span>version 0.1.0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>by continuing, you agree to <a href="https://cobalt.tools/about/terms" target="_blank" rel="noopener" id="footer-terms">terms</a> and <a href="https://cobalt.tools/about/terms" target="_blank" rel="noopener" id="footer-ethics">ethics of use</a></span>
+        </footer>
+    </main>
+
+    <!-- Overlay Panels -->
+    <div id="overlay" class="overlay hidden">
+        <div id="overlay-content" class="overlay-panel">
+            <button id="overlay-close" class="overlay-close">×</button>
+            <div id="overlay-body"></div>
+        </div>
+    </div>
+
+    <!-- Profile Overlay -->
+    <div id="profile-overlay" class="overlay hidden">
+        <div class="overlay-panel profile-panel">
+            <button id="profile-overlay-close" class="overlay-close">×</button>
+
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar-wrap" id="profile-avatar-preview"></div>
+                <div class="profile-header-info">
+                    <span class="profile-username" id="profile-username"></span>
+                    <span class="profile-provider" id="profile-provider"></span>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="profile-tabs">
+                <button class="profile-tab-btn active" data-tab="info">profile</button>
+                <button class="profile-tab-btn" data-tab="avatar">avatar</button>
+                <button class="profile-tab-btn" data-tab="storage">storage</button>
+            </div>
+
+            <!-- Tab: Info -->
+            <div class="profile-tab-panel active" id="profile-tab-info">
+                <div class="profile-field">
+                    <label class="profile-label">username</label>
+                    <div class="profile-value" id="profile-username-display"></div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">display name</label>
+                    <div class="profile-input-row">
+                        <input id="profile-display-name-input" class="profile-input" type="text" placeholder="your display name" maxlength="32" spellcheck="false" />
+                        <button id="profile-save-name" class="profile-save-btn">save</button>
+                    </div>
+                    <span class="profile-save-feedback" id="profile-save-feedback"></span>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">member since</label>
+                    <div class="profile-value" id="profile-joined"></div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">account type</label>
+                    <div class="profile-value" id="profile-provider-info"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Avatar -->
+            <div class="profile-tab-panel" id="profile-tab-avatar">
+                <p class="profile-hint">upload a PNG or JPG image, max 5MB. it's stored locally on your device.</p>
+                <button id="profile-avatar-upload-btn" class="profile-upload-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    choose image
+                </button>
+                <input type="file" id="avatar-file-input" accept="image/png,image/jpeg" style="display:none;" />
+            </div>
+
+            <!-- Tab: Storage -->
+            <div class="profile-tab-panel" id="profile-tab-storage">
+                <div class="storage-stat">
+                    <div class="storage-stat-label">your downloads</div>
+                    <div class="storage-stat-value" id="profile-storage-user">0 B</div>
+                </div>
+                <div class="storage-divider"></div>
+                <div class="storage-stat">
+                    <div class="storage-stat-label">all users combined</div>
+                    <div class="storage-stat-value global" id="profile-storage-global">0 B</div>
+                </div>
+                <p class="profile-hint" style="margin-top:16px;">tracked locally on this device. resets if you clear app data.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

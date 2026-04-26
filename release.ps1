@@ -1,0 +1,271 @@
+#!/usr/bin/env pwsh
+# =====================================================
+#  santi.tools — release script
+#  usage: .\release.ps1 [version]
+#  example: .\release.ps1 0.2.0
+#  if no version given, it prompts you
+# =====================================================
+
+param(
+    [string]$Version
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+function Write-Step([string]$msg) {
+    Write-Host ""
+    Write-Host "  $msg" -ForegroundColor Magenta
+}
+
+function Write-Ok([string]$msg) {
+    Write-Host "  ✓ $msg" -ForegroundColor Green
+}
+
+function Write-Warn([string]$msg) {
+    Write-Host "  ! $msg" -ForegroundColor Yellow
+}
+
+function Write-Fail([string]$msg) {
+    Write-Host ""
+    Write-Host "  ✗ $msg" -ForegroundColor Red
+    Write-Host ""
+    exit 1
+}
+
+function Confirm-Continue([string]$prompt) {
+    $ans = Read-Host "  $prompt [y/N]"
+    if ($ans -notmatch '^[Yy]$') {
+        Write-Host "  aborted." -ForegroundColor Gray
+        exit 0
+    }
+}
+
+# ── banner ────────────────────────────────────────────────────────────────────
+
+Write-Host ""
+Write-Host "  ┌─────────────────────────────────┐" -ForegroundColor DarkMagenta
+Write-Host "  │       santi.tools release        │" -ForegroundColor Magenta
+Write-Host "  └─────────────────────────────────┘" -ForegroundColor DarkMagenta
+Write-Host ""
+
+# ── check we're in the right place ───────────────────────────────────────────
+
+if (-not (Test-Path "src-tauri/tauri.conf.json")) {
+    Write-Fail "run this script from inside the cobalt-app directory"
+}
+
+# ── check dependencies ────────────────────────────────────────────────────────
+
+Write-Step "checking dependencies..."
+
+foreach ($cmd in @("git", "bun")) {
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+        Write-Fail "$cmd is not installed or not in PATH"
+    }
+    Write-Ok "$cmd found"
+}
+
+# check gh cli (optional but needed for release notes push)
+$ghAvailable = $null -ne (Get-Command "gh" -ErrorAction SilentlyContinue)
+if (-not $ghAvailable) {
+    Write-Warn "gh CLI not found — will push tag only, GitHub Actions will handle the release"
+    Write-Warn "install from: https://cli.github.com"
+} else {
+    Write-Ok "gh CLI found"
+}
+
+# ── get current version ───────────────────────────────────────────────────────
+
+$tauriConf = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+$currentVersion = $tauriConf.version
+Write-Host ""
+Write-Host "  current version: " -NoNewline -ForegroundColor Gray
+Write-Host $currentVersion -ForegroundColor Cyan
+
+# ── prompt for new version ────────────────────────────────────────────────────
+
+if (-not $Version) {
+    Write-Host ""
+    $Version = Read-Host "  new version (leave blank to keep $currentVersion)"
+    if (-not $Version) { $Version = $currentVersion }
+}
+
+# basic semver check
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    Write-Fail "version must be in format X.Y.Z (e.g. 0.2.0)"
+}
+
+Write-Host ""
+Write-Host "  releasing: " -NoNewline -ForegroundColor Gray
+Write-Host "v$Version" -ForegroundColor Magenta
+
+# ── check git status ──────────────────────────────────────────────────────────
+
+Write-Step "checking git status..."
+
+# first verify it's actually a git repo
+$null = git rev-parse --abbrev-ref HEAD 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "not a git repository. run 'git init' first, then commit your files."
+}
+
+$branch = git rev-parse --abbrev-ref HEAD
+Write-Ok "on branch: $branch"
+
+$gitStatus = git status --porcelain 2>&1
+if ($gitStatus) {
+    Write-Host ""
+    Write-Host "  uncommitted changes:" -ForegroundColor Yellow
+    $gitStatus | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkYellow }
+    Write-Host ""
+    Confirm-Continue "you have uncommitted changes. continue anyway?"
+}
+
+# ── parse CHANGELOG.md ────────────────────────────────────────────────────────
+
+Write-Step "reading CHANGELOG.md..."
+
+$changelogPath = "CHANGELOG.md"
+$releaseNotes = ""
+
+if (-not (Test-Path $changelogPath)) {
+    Write-Warn "CHANGELOG.md not found — release will have no notes"
+} else {
+    $lines = Get-Content $changelogPath
+    $inSection = $false
+    $sectionLines = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($line in $lines) {
+        # match ## [X.Y.Z] or ## [X.Y.Z] - date
+        if ($line -match "^## \[$Version\]") {
+            $inSection = $true
+            continue
+        }
+        # stop at the next ## heading
+        if ($inSection -and $line -match "^## \[") {
+            break
+        }
+        if ($inSection) {
+            $sectionLines.Add($line)
+        }
+    }
+
+    if ($sectionLines.Count -gt 0) {
+        $releaseNotes = ($sectionLines | Where-Object { $_ -ne "" -or $sectionLines.IndexOf($_) -gt 0 }) -join "`n"
+        $releaseNotes = $releaseNotes.Trim()
+        Write-Ok "found changelog section for v$Version"
+        Write-Host ""
+        Write-Host "  ── release notes preview ──────────────────" -ForegroundColor DarkGray
+        $releaseNotes -split "`n" | Select-Object -First 10 | ForEach-Object {
+            Write-Host "  $_" -ForegroundColor Gray
+        }
+        if (($releaseNotes -split "`n").Count -gt 10) {
+            Write-Host "  ... (truncated)" -ForegroundColor DarkGray
+        }
+        Write-Host "  ───────────────────────────────────────────" -ForegroundColor DarkGray
+    } else {
+        Write-Warn "no section found for [$Version] in CHANGELOG.md"
+        Write-Warn "add a '## [$Version]' section to CHANGELOG.md for release notes"
+    }
+}
+
+# ── bump versions ─────────────────────────────────────────────────────────────
+
+Write-Step "bumping version to $Version..."
+
+# tauri.conf.json
+$tauriRaw = Get-Content "src-tauri/tauri.conf.json" -Raw
+$tauriRaw = $tauriRaw -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$Version`""
+Set-Content "src-tauri/tauri.conf.json" $tauriRaw -NoNewline
+Write-Ok "src-tauri/tauri.conf.json"
+
+# Cargo.toml — only the [package] version, not dependency versions
+$cargoLines = Get-Content "src-tauri/Cargo.toml"
+$inPackage = $false
+$newCargoLines = foreach ($line in $cargoLines) {
+    if ($line -match '^\[package\]') { $inPackage = $true }
+    elseif ($line -match '^\[') { $inPackage = $false }
+
+    if ($inPackage -and $line -match '^version\s*=\s*"[^"]*"') {
+        "version = `"$Version`""
+    } else {
+        $line
+    }
+}
+Set-Content "src-tauri/Cargo.toml" $newCargoLines
+Write-Ok "src-tauri/Cargo.toml"
+
+# ── confirm before committing ─────────────────────────────────────────────────
+
+Write-Host ""
+Confirm-Continue "commit, tag v$Version, and push to GitHub?"
+
+# ── git commit + tag ──────────────────────────────────────────────────────────
+
+Write-Step "committing version bump..."
+
+git add "src-tauri/tauri.conf.json" "src-tauri/Cargo.toml"
+
+# also stage CHANGELOG if it was modified
+if (Test-Path $changelogPath) {
+    git add $changelogPath
+}
+
+git commit -m "chore: release v$Version"
+if ($LASTEXITCODE -ne 0) { Write-Fail "git commit failed" }
+Write-Ok "committed"
+
+git tag "v$Version"
+if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed — tag may already exist" }
+Write-Ok "tagged v$Version"
+
+Write-Step "pushing to origin..."
+git push origin $branch
+if ($LASTEXITCODE -ne 0) { Write-Fail "git push failed — is the remote set? run: git remote add origin https://github.com/Snowy-NOPING/santi.tools.git" }
+git push origin "v$Version"
+if ($LASTEXITCODE -ne 0) { Write-Fail "git push tag failed" }
+Write-Ok "pushed branch and tag"
+
+# ── optionally create GitHub release via gh CLI ───────────────────────────────
+
+if ($ghAvailable -and $releaseNotes) {
+    Write-Step "creating GitHub release via gh CLI..."
+
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    Set-Content $tempFile $releaseNotes
+
+    gh release create "v$Version" `
+        --repo "Snowy-NOPING/santi.tools" `
+        --title "santi.tools v$Version" `
+        --notes-file $tempFile `
+        --draft
+
+    Remove-Item $tempFile
+    Write-Ok "draft release created at github.com/Snowy-NOPING/santi.tools/releases"
+    Write-Warn "it's a draft — GitHub Actions will attach the .exe, then you can publish it"
+} elseif ($ghAvailable) {
+    Write-Step "creating GitHub release via gh CLI (no notes)..."
+    gh release create "v$Version" `
+        --repo "Snowy-NOPING/santi.tools" `
+        --title "santi.tools v$Version" `
+        --generate-notes `
+        --draft
+    Write-Ok "draft release created"
+} else {
+    Write-Host ""
+    Write-Host "  GitHub Actions will build and publish the release automatically." -ForegroundColor Gray
+    Write-Host "  track it at: https://github.com/Snowy-NOPING/santi.tools/actions" -ForegroundColor Cyan
+}
+
+# ── done ──────────────────────────────────────────────────────────────────────
+
+Write-Host ""
+Write-Host "  ┌─────────────────────────────────────────────────────┐" -ForegroundColor DarkGreen
+Write-Host "  │  v$Version released!                                    " -NoNewline -ForegroundColor Green
+Write-Host "│" -ForegroundColor DarkGreen
+Write-Host "  │  actions: https://github.com/Snowy-NOPING/santi.tools/actions  │" -ForegroundColor DarkGreen
+Write-Host "  └─────────────────────────────────────────────────────┘" -ForegroundColor DarkGreen
+Write-Host ""
