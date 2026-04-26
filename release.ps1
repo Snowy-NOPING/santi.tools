@@ -224,33 +224,114 @@ git push origin "v$Version"
 if ($LASTEXITCODE -ne 0) { Write-Fail "git push tag failed" }
 Write-Ok "pushed branch and tag"
 
+# ── optionally build locally ──────────────────────────────────────────────────
+
+$ansBuild = Read-Host "  do you want to build the installer locally right now? [y/N]"
+$doLocalBuild = $ansBuild -match '^[Yy]$'
+
+$installerPath = ""
+if ($doLocalBuild) {
+    Write-Step "building tauri app..."
+    bun tauri build
+    if ($LASTEXITCODE -ne 0) { Write-Fail "tauri build failed" }
+
+    Write-Step "generating artwork..."
+    Add-Type -AssemblyName System.Drawing
+    $bmp = New-Object System.Drawing.Bitmap(164, 314)
+    $g   = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::FromArgb(10, 10, 10))
+    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        [System.Drawing.Point]::new(0,0), [System.Drawing.Point]::new(164,200),
+        [System.Drawing.Color]::FromArgb(90,212,160,255),
+        [System.Drawing.Color]::FromArgb(0,10,10,10))
+    $g.FillRectangle($brush, 0, 0, 164, 220)
+    $f1 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Bold)
+    $f2 = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Regular)
+    $g.DrawString("santi",  $f1, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(212,160,255))), 14, 262)
+    $g.DrawString(".tools", $f2, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136,136,136))), 68, 262)
+    $g.Dispose()
+    $bmp.Save("installer/wizard-image.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $bmp.Dispose()
+
+    $b2 = New-Object System.Drawing.Bitmap(55, 55)
+    $g2 = [System.Drawing.Graphics]::FromImage($b2)
+    $g2.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g2.Clear([System.Drawing.Color]::FromArgb(10,10,10))
+    $br2 = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        [System.Drawing.Point]::new(0,0), [System.Drawing.Point]::new(55,55),
+        [System.Drawing.Color]::FromArgb(212,160,255),
+        [System.Drawing.Color]::FromArgb(124,92,191))
+    $g2.FillEllipse($br2, 4, 4, 47, 47)
+    $f3 = New-Object System.Drawing.Font("Segoe UI", 20, [System.Drawing.FontStyle]::Bold)
+    $g2.DrawString("s", $f3, (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(10,10,10))), 12, 10)
+    $g2.Dispose()
+    $b2.Save("installer/wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+    $b2.Dispose()
+    Write-Ok "artwork generated"
+
+    Write-Step "compiling custom installer..."
+    $nsisExe = Get-ChildItem -Recurse "src-tauri\target\release\bundle\nsis" -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $nsisExe) { Write-Fail "could not find tauri NSIS installer" }
+
+    New-Item -ItemType Directory -Force -Path dist | Out-Null
+    & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$Version" "/DNsisExe=$($nsisExe.FullName)" "/Odist" "/Fsanti.tools-$Version-setup" "installer\installer.iss"
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Inno Setup compilation failed" }
+
+    $installerPath = "dist\santi.tools-$Version-setup.exe"
+    Write-Ok "built: $installerPath"
+}
+
 # ── optionally create GitHub release via gh CLI ───────────────────────────────
 
 if ($ghAvailable -and $releaseNotes) {
-    Write-Step "creating draft GitHub release via gh CLI..."
+    Write-Step "creating GitHub release via gh CLI..."
 
     $tempFile = [System.IO.Path]::GetTempFileName() + ".md"
     Set-Content $tempFile $releaseNotes
 
-    gh release create "v$Version" `
-        --repo "Snowy-NOPING/santi.tools" `
-        --title "santi.tools v$Version" `
-        --notes-file $tempFile `
-        --draft
+    if ($doLocalBuild) {
+        gh release create "v$Version" $installerPath `
+            --repo "Snowy-NOPING/santi.tools" `
+            --title "santi.tools v$Version" `
+            --notes-file $tempFile `
+            --draft=false
+        Write-Ok "release created and $installerPath uploaded!"
+    } else {
+        gh release create "v$Version" `
+            --repo "Snowy-NOPING/santi.tools" `
+            --title "santi.tools v$Version" `
+            --notes-file $tempFile `
+            --draft
+        Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
+    }
 
     Remove-Item $tempFile
-    Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
 } elseif ($ghAvailable) {
-    Write-Step "creating draft GitHub release via gh CLI..."
-    gh release create "v$Version" `
-        --repo "Snowy-NOPING/santi.tools" `
-        --title "santi.tools v$Version" `
-        --generate-notes `
-        --draft
-    Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
+    Write-Step "creating GitHub release via gh CLI..."
+
+    if ($doLocalBuild) {
+        gh release create "v$Version" $installerPath `
+            --repo "Snowy-NOPING/santi.tools" `
+            --title "santi.tools v$Version" `
+            --generate-notes `
+            --draft=false
+        Write-Ok "release created and $installerPath uploaded!"
+    } else {
+        gh release create "v$Version" `
+            --repo "Snowy-NOPING/santi.tools" `
+            --title "santi.tools v$Version" `
+            --generate-notes `
+            --draft
+        Write-Ok "draft release created — GitHub Actions will build and attach the installer, then publish it"
+    }
 } else {
     Write-Host ""
-    Write-Host "  GitHub Actions will build and publish the release automatically." -ForegroundColor Gray
+    if ($doLocalBuild) {
+        Write-Host "  gh CLI not found. You'll need to manually upload $installerPath to GitHub Releases." -ForegroundColor Yellow
+    } else {
+        Write-Host "  GitHub Actions will build and publish the release automatically." -ForegroundColor Gray
+    }
     Write-Host "  track it at: https://github.com/Snowy-NOPING/santi.tools/actions" -ForegroundColor Cyan
 }
 
