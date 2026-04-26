@@ -79,20 +79,12 @@ Filename: "{localappdata}\santi.tools\santi.tools.exe"; \
 ; ── Custom UI code ────────────────────────────────
 [Code]
 var
-  AnimTimer:     NativeUInt;
   AnimFrame:     Integer;
   DotLabel:      TLabel;
   BarPanel:      TPanel;
   BarFill:       TPanel;
   BarWidth:      Integer;
   BarProgress:   Integer;
-
-// ── Animated progress bar fill ────────────────────
-procedure AnimTick(h, msg, id: NativeUInt; t: DWORD);
-  external 'SetTimer@user32.dll stdcall';
-
-procedure KillTimerExt(h: NativeUInt; id: NativeUInt);
-  external 'KillTimer@user32.dll stdcall';
 
 procedure OnAnimTimer(Sender: TObject);
 begin
