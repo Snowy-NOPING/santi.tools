@@ -212,59 +212,62 @@ function initAuth() {
 initAuth();
 
 // ===== Google OAuth =====
-// Uses Google's OAuth2 implicit flow — opens the system browser, user signs in,
-// Google redirects to our custom URI scheme which Tauri intercepts.
+// Uses Google's OAuth2 implicit flow via a temporary local Rust HTTP server.
 // You must register your OAuth client at console.cloud.google.com and set
-// the redirect URI to: https://santi.tools/auth/callback (or your registered URI).
-// Replace GOOGLE_CLIENT_ID below with your actual client ID.
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
-const GOOGLE_REDIRECT_URI = 'https://santi.tools/auth/callback';
+// the redirect URI to: http://127.0.0.1:3434/callback
+let GOOGLE_CLIENT_ID = localStorage.getItem('google_client_id') || 'YOUR_GOOGLE_CLIENT_ID';
 
 async function startGoogleOAuth() {
-    const state = generateSalt(); // random state for CSRF protection
+    if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID' || !GOOGLE_CLIENT_ID) {
+        const input = prompt("To use Google Login, please enter your Google OAuth Client ID:\n\n(Make sure you added http://127.0.0.1:3434/callback to your Authorized Redirect URIs in Google Cloud Console!)");
+        if (!input) return;
+        GOOGLE_CLIENT_ID = input.trim();
+        localStorage.setItem('google_client_id', GOOGLE_CLIENT_ID);
+    }
+
+    const state = generateSalt();
     sessionStorage.setItem('oauth-state', state);
 
-    const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: GOOGLE_REDIRECT_URI,
-        response_type: 'token',
-        scope: 'openid email profile',
-        state,
-        prompt: 'select_account',
-    });
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-
     try {
+        // Start local server and get redirect URI (http://127.0.0.1:3434/callback)
+        const redirectUri = await invoke('start_oauth_server');
+
+        const params = new URLSearchParams({
+            client_id: GOOGLE_CLIENT_ID,
+            redirect_uri: redirectUri,
+            response_type: 'token',
+            scope: 'openid email profile',
+            state,
+            prompt: 'select_account',
+        });
+
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+
         const { open } = window.__TAURI__.opener || await import('@tauri-apps/plugin-opener');
         await open(authUrl);
-        // Show a waiting message — the user will complete auth in their browser
         showGoogleWaiting();
     } catch (err) {
         console.error('Failed to open Google OAuth:', err);
+        showAuthError(loginError, 'Failed to start login server');
     }
 }
 
 function showGoogleWaiting() {
-    // Replace auth container content temporarily with a waiting state
     const subtitle = document.getElementById('auth-subtitle');
     subtitle.textContent = 'complete sign-in in your browser...';
 }
 
-// Listen for the OAuth callback via deep link (tauri://deep-link)
-// This requires registering a deep link scheme in tauri.conf.json
-// and handling it in the Rust side, OR using a local HTTP server.
-// For simplicity, we also support manual token paste via a prompt.
-// The deep link handler below will fire if the scheme is configured.
-window.__TAURI__?.event?.listen('deep-link://new-url', async (event) => {
-    const url = Array.isArray(event.payload) ? event.payload[0] : event.payload;
-    handleOAuthCallback(url);
+// Listen for the OAuth token from the Rust local server
+window.__TAURI__?.event?.listen('oauth-token', async (event) => {
+    // We receive the hash fragment as the payload (e.g., #state=...&access_token=...)
+    const hash = event.payload || '';
+    handleOAuthCallback(hash);
 });
 
-async function handleOAuthCallback(urlStr) {
+async function handleOAuthCallback(hashStr) {
     try {
         // The token is in the fragment: #access_token=...&state=...
-        const hash = urlStr.includes('#') ? urlStr.split('#')[1] : urlStr.split('?')[1] || '';
+        const hash = hashStr.replace(/^#/, '');
         const params = new URLSearchParams(hash);
         const accessToken = params.get('access_token');
         const returnedState = params.get('state');
@@ -1240,12 +1243,13 @@ compressDropzone?.addEventListener('drop', (e) => {
 });
 compressFileInput?.addEventListener('change', () => {
     if (compressFileInput.files.length) addCompressFiles(compressFileInput.files);
+    compressFileInput.value = '';
 });
 
 function addCompressFiles(fileList) {
     for (const f of fileList) {
         if (!compressFiles.find(x => x.name === f.name && x.size === f.size)) {
-            compressFiles.push({ file: f, name: f.name, size: f.size, status: 'pending' });
+            compressFiles.push({ file: f, name: f.name, size: f.size, status: 'pending', savedSize: null });
         }
     }
     renderCompressQueue();
@@ -1255,18 +1259,31 @@ function renderCompressQueue() {
     if (!compressQueue) return;
     if (compressFiles.length === 0) {
         compressQueue.classList.add('hidden');
-        compressRunBtn.disabled = true;
+        if (compressRunBtn) compressRunBtn.disabled = true;
         return;
     }
     compressQueue.classList.remove('hidden');
-    compressRunBtn.disabled = false;
+    if (compressRunBtn) compressRunBtn.disabled = false;
+
     compressQueue.innerHTML = compressFiles.map((item, i) => {
         const sizeMB = (item.size / 1024 / 1024).toFixed(2);
-        const statusClass = item.status === 'done' ? 'success' : item.status === 'error' ? 'error' : item.status === 'working' ? 'loading' : '';
-        const statusText = item.status === 'done' ? 'done' : item.status === 'error' ? 'error' : item.status === 'working' ? '...' : `${sizeMB} MB`;
+        let statusClass = '';
+        let statusText = `${sizeMB} MB`;
+        if (item.status === 'done') {
+            statusClass = 'success';
+            const savedMB = item.savedSize != null ? (item.savedSize / 1024 / 1024).toFixed(2) : '?';
+            const pct = item.savedSize != null ? Math.round((1 - item.savedSize / item.size) * 100) : 0;
+            statusText = `${savedMB} MB (-${pct}%)`;
+        } else if (item.status === 'error') {
+            statusClass = 'error';
+            statusText = item.errorMsg || 'error';
+        } else if (item.status === 'working') {
+            statusClass = 'loading';
+            statusText = 'compressing...';
+        }
         return `<div class="compress-queue-item">
             <div class="compress-queue-info">
-                <span class="compress-queue-name">${item.name}</span>
+                <span class="compress-queue-name" title="${item.name}">${item.name}</span>
                 <span class="compress-queue-size ${statusClass}">${statusText}</span>
             </div>
             <button class="compress-queue-remove" onclick="removeCompressFile(${i})" title="Remove">
@@ -1283,41 +1300,45 @@ window.removeCompressFile = (i) => {
 
 compressRunBtn?.addEventListener('click', async () => {
     const quality = getSegValue('compressQuality') || 'balanced';
-    const qualityMap = { high: '28', balanced: '32', small: '38' }; // CRF values for ffmpeg
-    const crf = qualityMap[quality];
 
     for (let i = 0; i < compressFiles.length; i++) {
         const item = compressFiles[i];
         if (item.status === 'done') continue;
+
         item.status = 'working';
+        item.errorMsg = null;
         renderCompressQueue();
 
         try {
-            // Use Tauri save dialog to pick output path
-            const ext = item.name.split('.').pop();
+            const ext = item.name.split('.').pop().toLowerCase();
             const baseName = item.name.replace(/\.[^.]+$/, '');
-            const outName = `${baseName}_compressed.${ext}`;
+            const isImage = ['jpg','jpeg','png','webp','gif','bmp'].includes(ext);
+            const isVideo = ['mp4','mov','mkv','webm','avi','m4v'].includes(ext);
+            const isAudio = ['mp3','ogg','opus','wav','flac','m4a','aac'].includes(ext);
 
+            if (!isImage && !isVideo && !isAudio) {
+                throw new Error('unsupported file type');
+            }
+
+            // Pick output extension
+            const outExt = isImage ? 'jpg' : isVideo ? 'mp4' : 'mp3';
+            const outName = `${baseName}_compressed.${outExt}`;
+
+            // Save dialog
             let savePath = null;
             try {
                 const { save } = window.__TAURI__.dialog || await import('@tauri-apps/plugin-dialog');
                 savePath = await save({
                     defaultPath: outName,
-                    filters: [{ name: 'Media', extensions: [ext] }, { name: 'All Files', extensions: ['*'] }],
+                    filters: [{ name: 'Output', extensions: [outExt] }, { name: 'All Files', extensions: ['*'] }],
                     title: `Save compressed: ${item.name}`,
                 });
             } catch (_) {}
 
             if (!savePath) { item.status = 'pending'; renderCompressQueue(); continue; }
 
-            // Read file as array buffer, write to temp, then invoke ffmpeg via yt-dlp shell
-            // Since we don't have ffmpeg as a sidecar, we use the system ffmpeg if available
-            // and fall back to a canvas-based image compressor for images
-            const fileExt = ext.toLowerCase();
-            const isImage = ['jpg','jpeg','png','webp','gif'].includes(fileExt);
-
             if (isImage) {
-                // Canvas-based image compression
+                // ── Canvas compression (no dependencies) ──────────
                 const dataUrl = await new Promise((res, rej) => {
                     const reader = new FileReader();
                     reader.onload = e => res(e.target.result);
@@ -1325,32 +1346,80 @@ compressRunBtn?.addEventListener('click', async () => {
                     reader.readAsDataURL(item.file);
                 });
                 const img = await new Promise((res, rej) => {
-                    const i = new Image();
-                    i.onload = () => res(i);
-                    i.onerror = rej;
-                    i.src = dataUrl;
+                    const el = new Image();
+                    el.onload = () => res(el);
+                    el.onerror = rej;
+                    el.src = dataUrl;
                 });
+
+                // Optionally scale down for 'small' quality
+                let w = img.width, h = img.height;
+                if (quality === 'small' && (w > 1920 || h > 1080)) {
+                    const scale = Math.min(1920 / w, 1080 / h);
+                    w = Math.round(w * scale);
+                    h = Math.round(h * scale);
+                } else if (quality === 'balanced' && (w > 3840 || h > 2160)) {
+                    const scale = Math.min(3840 / w, 2160 / h);
+                    w = Math.round(w * scale);
+                    h = Math.round(h * scale);
+                }
+
                 const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                canvas.getContext('2d').drawImage(img, 0, 0);
-                const qualityVal = quality === 'high' ? 0.9 : quality === 'balanced' ? 0.75 : 0.5;
-                const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', qualityVal));
-                const buf = await blob.arrayBuffer();
-                await invoke('write_file', { path: savePath, data: Array.from(new Uint8Array(buf)) });
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+                const jpegQuality = quality === 'high' ? 0.92 : quality === 'balanced' ? 0.78 : 0.55;
+                const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', jpegQuality));
+                const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+
+                await invoke('write_bytes', { path: savePath, data: bytes });
+                item.savedSize = blob.size;
                 item.status = 'done';
+
             } else {
-                // Video/audio: invoke ffmpeg via shell
-                await invoke('compress_with_ffmpeg', {
-                    inputPath: item.file.path || item.name,
-                    outputPath: savePath,
-                    crf,
+                // ── ffmpeg via sidecar ─────────────────────────────
+                // Write the input file to a temp path first
+                const inputBytes = Array.from(new Uint8Array(await item.file.arrayBuffer()));
+                const tempInput = await invoke('write_temp_file', {
+                    name: item.name,
+                    data: inputBytes,
                 });
+
+                const crfMap = { high: '23', balanced: '28', small: '35' };
+                const audioBrMap = { high: '192k', balanced: '128k', small: '96k' };
+
+                let ffmpegArgs;
+                if (isVideo) {
+                    ffmpegArgs = [
+                        '-i', tempInput,
+                        '-c:v', 'libx264',
+                        '-crf', crfMap[quality],
+                        '-preset', 'fast',
+                        '-c:a', 'aac',
+                        '-b:a', audioBrMap[quality],
+                        '-movflags', '+faststart',
+                        '-y', savePath
+                    ];
+                } else {
+                    ffmpegArgs = [
+                        '-i', tempInput,
+                        '-c:a', 'libmp3lame',
+                        '-b:a', audioBrMap[quality],
+                        '-y', savePath
+                    ];
+                }
+
+                const result = await invoke('run_ffmpeg', { args: ffmpegArgs });
+                await invoke('delete_temp_file', { path: tempInput });
+
+                // Get output size
+                const outSize = await invoke('get_file_size', { path: savePath });
+                item.savedSize = outSize;
                 item.status = 'done';
             }
         } catch (err) {
-            console.error('Compress error:', err);
             item.status = 'error';
+            item.errorMsg = String(err).replace('Error: ', '').slice(0, 40);
         }
         renderCompressQueue();
     }

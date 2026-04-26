@@ -294,6 +294,56 @@ async fn get_ytdlp_metadata(app: tauri::AppHandle, url: String) -> Result<String
 }
 
 #[tauri::command]
+fn write_bytes(path: String, data: Vec<u8>) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, &data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_temp_file(name: String, data: Vec<u8>) -> Result<String, String> {
+    let tmp = std::env::temp_dir().join(format!("santitools_{}", name));
+    std::fs::write(&tmp, &data).map_err(|e| e.to_string())?;
+    Ok(tmp.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn delete_temp_file(path: String) -> Result<(), String> {
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[tauri::command]
+fn get_file_size(path: String) -> Result<u64, String> {
+    std::fs::metadata(&path)
+        .map(|m| m.len())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn run_ffmpeg(app: tauri::AppHandle, args: Vec<String>) -> Result<(), String> {
+    let output = app.shell()
+        .command("ffmpeg")
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| format!("ffmpeg not found — install ffmpeg and add it to PATH: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Extract last meaningful line from ffmpeg stderr
+        let msg = stderr.lines()
+            .filter(|l| !l.is_empty())
+            .last()
+            .unwrap_or("ffmpeg failed")
+            .to_string();
+        return Err(msg);
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn nest_exchange_code(code: String) -> Result<String, String> {
     // Exchange the OAuth authorization code for an access token.
     // The client_secret lives here in Rust — never exposed to the frontend.
@@ -333,6 +383,65 @@ async fn nest_exchange_code(code: String) -> Result<String, String> {
     Ok(access_token)
 }
 
+use std::net::TcpListener;
+use std::io::{Read, Write};
+use tauri::Emitter;
+
+#[tauri::command]
+async fn start_oauth_server(app: tauri::AppHandle) -> Result<String, String> {
+    // We bind with port 0 to let the OS pick a free port, or we can use 3434.
+    // Using 3434 means the Google Cloud console only needs one exact redirect URI configured.
+    let listener = TcpListener::bind("127.0.0.1:3434").map_err(|e| e.to_string())?;
+    
+    // Run in a background thread so we don't block Tauri
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            if let Ok(mut stream) = stream {
+                let mut buffer = [0; 2048];
+                if stream.read(&mut buffer).is_err() { continue; }
+                let request = String::from_utf8_lossy(&buffer);
+                
+                if request.starts_with("GET /callback") {
+                    // Google implicit flow puts token in the URL #hash fragment.
+                    // Browsers DO NOT send hash fragments to the server!
+                    // So we must return a small HTML page that parses the hash and POSTs it back to us.
+                    let html = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                        <html><head><style>\
+                        body { background: #0a0a0a; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }\
+                        </style></head><body>\
+                        <h2>Logging you in...</h2><p>Please wait.</p>\
+                        <script>\
+                            const hash = window.location.hash || window.location.search;\
+                            fetch('/token', { method: 'POST', body: hash }).then(() => {\
+                                document.body.innerHTML = '<h2>Success!</h2><p>You can close this window and return to santi.tools</p>';\
+                                window.close();\
+                            }).catch(() => {\
+                                document.body.innerHTML = '<h2>Error!</h2><p>Could not send token to app.</p>';\
+                            });\
+                        </script>\
+                        </body></html>";
+                    let _ = stream.write_all(html.as_bytes());
+                } else if request.starts_with("POST /token") {
+                    // Extract the body (the hash fragment)
+                    let body = request.split("\r\n\r\n").last().unwrap_or("").trim_matches('\0').to_string();
+                    
+                    // Emit event to frontend
+                    let _ = app.emit("oauth-token", body);
+                    
+                    let response = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n\r\n";
+                    let _ = stream.write_all(response.as_bytes());
+                    break; // Stop server after receiving token
+                } else if request.starts_with("OPTIONS") {
+                    let response = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\n\r\n";
+                    let _ = stream.write_all(response.as_bytes());
+                }
+            }
+        }
+    });
+    
+    Ok("http://127.0.0.1:3434/callback".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -345,7 +454,13 @@ pub fn run() {
             download_file,
             download_with_ytdlp,
             get_ytdlp_metadata,
-            nest_exchange_code
+            write_bytes,
+            write_temp_file,
+            delete_temp_file,
+            get_file_size,
+            run_ffmpeg,
+            nest_exchange_code,
+            start_oauth_server
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
