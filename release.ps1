@@ -218,9 +218,9 @@ if ($status) {
     Write-Ok "no new changes to commit"
 }
 
-git tag "v$Version"
-if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed — tag may already exist" }
-Write-Ok "tagged v$Version"
+git tag -f "v$Version"
+if ($LASTEXITCODE -ne 0) { Write-Fail "git tag failed" }
+Write-Ok "tagged v$Version (forced)"
 
 Write-Step "pushing to origin..."
 git push origin $branch
