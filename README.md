@@ -28,7 +28,6 @@ grab the latest `.exe` from [releases](https://github.com/Snowy-NOPING/santi.too
 > windows might flag the `.exe` because it's not signed with an expensive certificate. just click "run anyway", it’s open source.
 
 =======
->>>>>>> fedfdf2 (chore: release v1.3.0)
 ```powershell
 git clone https://github.com/Snowy-NOPING/santi.tools
 cd santi.tools/cobalt-app
